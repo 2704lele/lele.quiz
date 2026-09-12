@@ -68,30 +68,36 @@ jobs:
           pip install gspread google-api-python-client google-auth google-auth-oauthlib requests
 
       - name: "Configure Zero-Leak Vault Credentials"
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_OAUTH_JSON: ${{ secrets.GOOGLE_USER_OAUTH2_JSON }}
+          BUFFER_CREDS: ${{ secrets.BUFFER_CREDENTIALS_JSON }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_sa
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_oauth
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/buffer
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/telegram
 
-          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" ]; then
-            echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+          if [ -n "$GCP_SA_KEY" ]; then
+            printf '%s\n' "$GCP_SA_KEY" > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
           fi
 
-          if [ -n "${{ secrets.GOOGLE_USER_OAUTH2_JSON }}" ]; then
-            echo '${{ secrets.GOOGLE_USER_OAUTH2_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+          if [ -n "$GOOGLE_OAUTH_JSON" ]; then
+            printf '%s\n' "$GOOGLE_OAUTH_JSON" > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
           fi
 
-          if [ -n "${{ secrets.BUFFER_CREDENTIALS_JSON }}" ]; then
-            echo '${{ secrets.BUFFER_CREDENTIALS_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/buffer/credentials.json
+          if [ -n "$BUFFER_CREDS" ]; then
+            printf '%s\n' "$BUFFER_CREDS" > ~/.cloud-profiles/lelehoctiengtrung/buffer/credentials.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/buffer/credentials.json
           fi
 
-          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
-            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
-            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+          if [ -n "$TELEGRAM_TOKEN" ]; then
+            echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT:-1187577977}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
           fi
 

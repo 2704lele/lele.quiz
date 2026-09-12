@@ -51,6 +51,13 @@ jobs:
           pip install gspread google-api-python-client google-auth google-auth-oauthlib pypinyin requests pyyaml
 
       - name: "Configure Zero-Leak Vault Credentials"
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_OAUTH_JSON: ${{ secrets.GOOGLE_USER_OAUTH2_JSON }}
+          GEMINI_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          AGNES_KEYS: ${{ secrets.AGNES_API_KEYS }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_sa
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_oauth
@@ -58,29 +65,29 @@ jobs:
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/agnes
           mkdir -p ~/.cloud-profiles/lelehoctiengtrung/telegram
 
-          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" ]; then
-            echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+          if [ -n "$GCP_SA_KEY" ]; then
+            printf '%s\n' "$GCP_SA_KEY" > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
           fi
 
-          if [ -n "${{ secrets.GOOGLE_USER_OAUTH2_JSON }}" ]; then
-            echo '${{ secrets.GOOGLE_USER_OAUTH2_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+          if [ -n "$GOOGLE_OAUTH_JSON" ]; then
+            printf '%s\n' "$GOOGLE_OAUTH_JSON" > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
           fi
 
-          if [ -n "${{ secrets.GEMINI_API_KEYS }}" ]; then
-            echo '${{ secrets.GEMINI_API_KEYS }}' > ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
+          if [ -n "$GEMINI_KEYS" ]; then
+            printf '%s\n' "$GEMINI_KEYS" > ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
           fi
 
-          if [ -n "${{ secrets.AGNES_API_KEYS }}" ]; then
-            echo '${{ secrets.AGNES_API_KEYS }}' > ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
+          if [ -n "$AGNES_KEYS" ]; then
+            printf '%s\n' "$AGNES_KEYS" > ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
           fi
 
-          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
-            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
-            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+          if [ -n "$TELEGRAM_TOKEN" ]; then
+            echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT:-1187577977}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
           fi
 

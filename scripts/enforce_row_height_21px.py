@@ -36,10 +36,28 @@ TARGET_ROW_HEIGHT_PX = 21
 
 def get_sheets_service():
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    if not os.path.exists(SA_PATH):
-        raise FileNotFoundError(f"Service account not found at {SA_PATH}")
-    creds = Credentials.from_service_account_file(SA_PATH, scopes=scopes)
-    return build("sheets", "v4", credentials=creds)
+    env_json = os.getenv("GCP_SERVICE_ACCOUNT_KEY") or os.getenv("GCP_SERVICE_ACCOUNT_JSON") or os.getenv("SERVICE_ACCOUNT_JSON")
+    if env_json and env_json.strip().startswith("{"):
+        try:
+            import json
+            info = json.loads(env_json)
+            creds = Credentials.from_service_account_info(info, scopes=scopes)
+            return build("sheets", "v4", credentials=creds)
+        except Exception:
+            pass
+
+    search_paths = [
+        SA_PATH,
+        os.getenv("GOOGLE_APPLICATION_CREDENTIALS", ""),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pinyinquiz", "configs", "service_account.json"),
+        os.path.expanduser("~/.config/gspread/service_account.json"),
+    ]
+    for p in search_paths:
+        if p and os.path.exists(p) and os.path.getsize(p) > 10:
+            creds = Credentials.from_service_account_file(p, scopes=scopes)
+            return build("sheets", "v4", credentials=creds)
+
+    raise FileNotFoundError(f"Service account not found at {SA_PATH}")
 
 
 def execute_with_backoff(
