@@ -45,16 +45,16 @@ def main():
         else:
             success = orch.dispatch_quiz_job(pipeline=args.tab, row_id=args.row, quality=args.quality)
     else:
-        # In GitHub Actions: Execute via Colab CLI or local runner scripts
-        colab_script = os.path.join(QUIZ_ROOT, "scripts", "colab_render_cli.py")
-        if os.path.exists(colab_script):
-            cmd = f"python3 {colab_script} --pipeline {args.tab} --quality {args.quality}"
+        # In GitHub Actions: Execute directly on GHA Cloud Runner
+        worker_script = os.path.join(QUIZ_ROOT, "colab", "colab_worker_quiz.py")
+        if os.path.exists(worker_script):
+            cmd = f"python3 {worker_script} --pipeline {args.tab} --quality {args.quality}"
             if args.row:
-                cmd += f" --row {args.row}"
+                cmd += f" --row-id {args.row}"
             rc = os.system(cmd)
             success = (rc == 0)
         else:
-            print("❌ Colab dispatcher script not found.")
+            print("❌ Cloud worker script not found.")
             success = False
 
     print("\n📏 Enforcing strict 21px row height invariant across all tabs...")

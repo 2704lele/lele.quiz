@@ -46,8 +46,13 @@ def log(msg: str):
 
 
 def find_uploaded_file(filename: str) -> Optional[Path]:
-    """Finds uploaded file regardless of whether Jupyter Contents placed it at /, /content/, or cwd."""
+    """Finds uploaded file regardless of whether placed at vault, cwd, /, or /content/."""
     candidates = [
+        Path.home() / ".cloud-profiles" / "lelehoctiengtrung" / "google_sa" / filename,
+        Path.home() / ".cloud-profiles" / "lelehoctiengtrung" / "google_oauth" / filename,
+        Path.home() / ".cloud-profiles" / "lelehoctiengtrung" / "gemini" / filename,
+        Path.home() / ".cloud-profiles" / "lelehoctiengtrung" / "buffer" / filename,
+        Path(__file__).resolve().parent.parent / filename,
         Path(f"/{filename}"),
         Path(f"/content/{filename}"),
         Path(filename),
@@ -197,29 +202,33 @@ def setup_hardware() -> str:
 
 def setup_repo_and_fonts(repo_url: str = "") -> Path:
     """Ensure codebase is extracted from uploaded bundle or cloned."""
-    base_dir = Path("/content")
-    quiz_dir = base_dir / "quiz"
-    quiz_dir.mkdir(parents=True, exist_ok=True)
-
-    bundle_file = find_uploaded_file("quiz_bundle.tar.gz")
-
-    if bundle_file:
-        log(f"📦 Extracting codebase bundle from {bundle_file} into {quiz_dir}...")
-        subprocess.run(["tar", "-xzf", str(bundle_file), "-C", str(quiz_dir)], check=True)
-        log("✓ Codebase bundle extracted successfully.")
+    local_root = Path(__file__).resolve().parent.parent
+    if (local_root / "pinyinquiz").exists():
+        quiz_dir = local_root
     else:
-        log("⚠️ No quiz_bundle.tar.gz found! Checking git clone...")
-        repo_dir = base_dir / "lele2vid"
-        if not repo_dir.exists() and repo_url:
-            try:
-                log(f"📥 Cloning repository from {repo_url}...")
-                subprocess.run(["git", "clone", "--depth", "1", repo_url, str(repo_dir)], check=True)
+        base_dir = Path("/content")
+        quiz_dir = base_dir / "quiz"
+        quiz_dir.mkdir(parents=True, exist_ok=True)
+
+        bundle_file = find_uploaded_file("quiz_bundle.tar.gz")
+
+        if bundle_file:
+            log(f"📦 Extracting codebase bundle from {bundle_file} into {quiz_dir}...")
+            subprocess.run(["tar", "-xzf", str(bundle_file), "-C", str(quiz_dir)], check=True)
+            log("✓ Codebase bundle extracted successfully.")
+        else:
+            log("⚠️ No quiz_bundle.tar.gz found! Checking git clone...")
+            repo_dir = base_dir / "lele2vid"
+            if not repo_dir.exists() and repo_url:
+                try:
+                    log(f"📥 Cloning repository from {repo_url}...")
+                    subprocess.run(["git", "clone", "--depth", "1", repo_url, str(repo_dir)], check=True)
+                    quiz_dir = repo_dir / "quiz"
+                    log("✓ Repository cloned.")
+                except Exception as ge:
+                    log(f"⚠️ Git clone failed: {ge}")
+            elif repo_dir.exists():
                 quiz_dir = repo_dir / "quiz"
-                log("✓ Repository cloned.")
-            except Exception as ge:
-                log(f"⚠️ Git clone failed: {ge}")
-        elif repo_dir.exists():
-            quiz_dir = repo_dir / "quiz"
 
     fonts_dir = Path.home() / ".fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
