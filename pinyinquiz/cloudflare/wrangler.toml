@@ -1,0 +1,41 @@
+name = "lele-pinyinquiz"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "3591f5b61af3263ca14af7a1765cc954"
+
+# Cloudflare Workers AI Binding
+[ai]
+binding = "AI"
+
+# Cron Triggers DISABLED (No automatic random posting)
+[triggers]
+crons = []
+
+[vars]
+AUTO_PUBLISH_ENABLED = "false"
+SPREADSHEET_ID = "1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0"
+SHEET_TAB_NAME = "pinyin"
+TELEGRAM_CHAT_ID = "1187577977"
+GITHUB_REPO_OWNER = "naadld"
+GITHUB_REPO_NAME = "lele2vid"
+GITHUB_WORKFLOW_FILE = "Render.yml"
+AI_GATEWAY_NAME = "lelepinyinquiz"
+ACCOUNT_ID = "3591f5b61af3263ca14af7a1765cc954"
+AI_MODEL = "@cf/meta/llama-3.3-70b-instruct"
+GEMINI_MODEL = "gemini-3.7-flash"
+AGNES_MODEL = "agnes-2.0-flash"
+AGNES_BASE_URL = "https://apihub.agnes-ai.com/v1"
+CF_WEBHOOK_URL = "https://lele-pinyinquiz.hothihuong113.workers.dev/api/receive-ideas"
+
+# Secrets to be configured via `wrangler secret put <KEY>`:
+# - TELEGRAM_BOT_TOKEN
+# - TELEGRAM_CHAT_ID
+# - TELEGRAM_WEBHOOK_SECRET
+# - GCP_SERVICE_ACCOUNT_EMAIL
+# - GCP_SERVICE_ACCOUNT_PRIVATE_KEY
+# - GITHUB_TOKEN
+# - BUFFER_ACCESS_TOKEN
+# - BUFFER_PROFILE_IDS (Comma separated: tiktok_id,facebook_id,youtube_id)
+# - GEMINI_API_KEYS (Comma separated Google AI Studio keys)
+# - AGNES_API_KEYS (Comma separated Agnes AI keys)

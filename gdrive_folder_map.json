@@ -1,0 +1,41 @@
+{
+  "project_name": "lelehoctiengtrung_quiz",
+  "version": "2.0",
+  "spreadsheet_id": "1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0",
+  "code_sync_folder_id": "1C-n3Un-D6Teu4LapgIWWeVZ6l7toH8lm",
+  "backup_folder_id": "1QHYaOfvE8yoShR4UcM0o3zd0uOh7rhaK",
+  "_backup_folder_id": "1QHYaOfvE8yoShR4UcM0o3zd0uOh7rhaK",
+  "row_height_px": 21,
+  "standard_columns_count": 16,
+  "tabs": {
+    "pinyin": {
+      "sheet_id": 428807884,
+      "title": "pinyin",
+      "pipeline": "pinyinquiz",
+      "target_folder_id": "1f2mFUgpz_pYn3y9HqeHyOG9DzPMVH9QY",
+      "description": "Guess Pinyin from Hanzi (HSK 1-6)"
+    },
+    "vocabCN": {
+      "sheet_id": 1524986609,
+      "title": "vocabCN",
+      "pipeline": "vocabCNquiz",
+      "target_folder_id": "1eI7I4jQqGBjD7MC_NXJ4zwFANxrcZM1E",
+      "description": "Guess Vietnamese Meaning from Hanzi"
+    },
+    "vocabVN": {
+      "sheet_id": 463050430,
+      "title": "vocabVN",
+      "pipeline": "vocabVNquiz",
+      "target_folder_id": "1VPqs9h4LLmmmXWKDGWoAz1fUCylVLK2H",
+      "description": "Guess Hanzi from Vietnamese Meaning"
+    },
+    "multilevels": {
+      "sheet_id": 1040230455,
+      "title": "multilevels",
+      "pipeline": "multilevelsquiz",
+      "target_folder_id": "17xOkiW-XOWRDK2CCwNEl_rlf1rGKqKXm",
+      "description": "1 Core Meaning across 5 HSK Levels (30s Short)"
+    }
+  },
+  "target_folder_id": "1C-n3Un-D6Teu4LapgIWWeVZ6l7toH8lm"
+}

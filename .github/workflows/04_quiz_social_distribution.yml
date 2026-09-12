@@ -1,0 +1,129 @@
+name: "04 - Quiz Social Media Distribution (Gatekeeper 3 Guard)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tab:
+        description: "Target Quiz Tab"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "pinyin"
+          - "vocabCN"
+          - "vocabVN"
+          - "multilevels"
+      row_id:
+        description: "Specific Row ID to publish (leave empty to publish all 'Ready' rows)"
+        required: false
+        default: ""
+      channels:
+        description: "Publishing Channels (Buffer 1)"
+        required: true
+        default: "buffer1"
+        type: choice
+        options:
+          - "buffer1"
+          - "youtube"
+          - "tiktok"
+          - "facebook"
+      delay_minutes:
+        description: "Schedule Delay in Minutes (Interval)"
+        required: true
+        default: "30"
+        type: choice
+        options:
+          - "15"
+          - "30"
+          - "60"
+      dry_run:
+        description: "Dry-run mode (Simulate only, do not post)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: "Buffer Social Distribution (GK3 Guard)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python 3.10"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: "Install Python Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install gspread google-api-python-client google-auth google-auth-oauthlib requests
+
+      - name: "Configure Zero-Leak Vault Credentials"
+        run: |
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_sa
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_oauth
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/buffer
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/telegram
+
+          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" ]; then
+            echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+          fi
+
+          if [ -n "${{ secrets.GOOGLE_USER_OAUTH2_JSON }}" ]; then
+            echo '${{ secrets.GOOGLE_USER_OAUTH2_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+          fi
+
+          if [ -n "${{ secrets.BUFFER_CREDENTIALS_JSON }}" ]; then
+            echo '${{ secrets.BUFFER_CREDENTIALS_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/buffer/credentials.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/buffer/credentials.json
+          fi
+
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+          fi
+
+      - name: "Execute Social Publishing with Gatekeeper 3 Anti-Duplication"
+        env:
+          TARGET_TAB: ${{ github.event.inputs.tab }}
+          ROW_ID: ${{ github.event.inputs.row_id }}
+          CHANNELS: ${{ github.event.inputs.channels }}
+          DELAY_MINUTES: ${{ github.event.inputs.delay_minutes }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          DRY_FLAG=""
+          if [ "$DRY_RUN" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          fi
+          echo "🚀 Executing Social Distribution (GK3): Tab=$TARGET_TAB, Row=$ROW_ID, Channels=$CHANNELS"
+          python3 scripts/run_publish_dispatcher.py --tab "$TARGET_TAB" --row "$ROW_ID" --channels "$CHANNELS" --delay "$DELAY_MINUTES" $DRY_FLAG
+
+      - name: "Enforce 21px Row Height Invariant"
+        if: always()
+        run: |
+          python3 scripts/enforce_row_height_21px.py
+
+      - name: "Notify Completion to Telegram"
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            STATUS="${{ job.status }}"
+            MSG="🚀 <b>[GHA Social Distribution Complete]</b>%0AStatus: <b>$STATUS</b>%0ATab: <code>${{ github.event.inputs.tab }}</code>%0AAll eligible Ready videos have been scheduled to Buffer (YouTube Shorts, TikTok, Facebook Reels)."
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
+          fi

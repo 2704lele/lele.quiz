@@ -1,0 +1,112 @@
+name: "01 - Quiz Ideation & Scripting (Gatekeeper 1 QC)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tab:
+        description: "Target Quiz Tab"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "pinyin"
+          - "vocabCN"
+          - "vocabVN"
+          - "multilevels"
+      batch_count:
+        description: "Number of batches/ideas per tab"
+        required: true
+        default: "5"
+        type: choice
+        options:
+          - "5"
+          - "1"
+          - "10"
+  repository_dispatch:
+    types: [quiz_ideation]
+
+permissions:
+  contents: read
+
+jobs:
+  ideate:
+    name: "AI Ideation & Scripting (GK1)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python 3.10"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: "Install Python Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install gspread google-api-python-client google-auth google-auth-oauthlib pypinyin requests pyyaml
+
+      - name: "Configure Zero-Leak Vault Credentials"
+        run: |
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_sa
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_oauth
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/gemini
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/agnes
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/telegram
+
+          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" ]; then
+            echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+          fi
+
+          if [ -n "${{ secrets.GOOGLE_USER_OAUTH2_JSON }}" ]; then
+            echo '${{ secrets.GOOGLE_USER_OAUTH2_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+          fi
+
+          if [ -n "${{ secrets.GEMINI_API_KEYS }}" ]; then
+            echo '${{ secrets.GEMINI_API_KEYS }}' > ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
+          fi
+
+          if [ -n "${{ secrets.AGNES_API_KEYS }}" ]; then
+            echo '${{ secrets.AGNES_API_KEYS }}' > ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
+          fi
+
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+          fi
+
+      - name: "Execute Ideation & Gatekeeper 1 QC"
+        env:
+          TARGET_TAB: ${{ github.event.inputs.tab || github.event.client_payload.tab || 'all' }}
+          BATCH_COUNT: ${{ github.event.inputs.batch_count || github.event.client_payload.batch_count || '5' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "🚀 Running AI Ideation: Tab=$TARGET_TAB, Count=$BATCH_COUNT"
+          python3 scripts/run_ideation_dispatcher.py --tab "$TARGET_TAB" --count "$BATCH_COUNT"
+
+      - name: "Enforce 21px Row Height Invariant"
+        if: always()
+        run: |
+          python3 scripts/enforce_row_height_21px.py
+
+      - name: "Notify Completion to Telegram"
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            STATUS="${{ job.status }}"
+            MSG="💡 <b>[GHA Ideation Complete]</b>%0AStatus: <b>$STATUS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0ABatches: <code>${{ github.event.inputs.batch_count || '5' }}</code>%0AAll rows set to <b>Pending</b> (21px locked)."
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
+          fi

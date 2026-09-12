@@ -1,0 +1,66 @@
+name: "03 - Quiz Morning Audit & Verification (05:01 AM GMT+7)"
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [quiz_morning_audit]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: "Morning Gatekeeper Audit & Telegram Brief"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python 3.10"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: "Install Python Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install gspread google-api-python-client google-auth google-auth-oauthlib requests
+
+      - name: "Configure Zero-Leak Vault Credentials"
+        run: |
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_sa
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_oauth
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/telegram
+
+          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" ]; then
+            echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+          fi
+
+          if [ -n "${{ secrets.GOOGLE_USER_OAUTH2_JSON }}" ]; then
+            echo '${{ secrets.GOOGLE_USER_OAUTH2_JSON }}' > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+          fi
+
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+          fi
+
+      - name: "Execute Morning Audit & Verification"
+        id: run_audit
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}
+        run: |
+          echo "🔍 Starting Morning Audit across 4 Quiz Tabs..."
+          python3 scripts/run_morning_audit.py
+
+      - name: "Enforce 21px Row Height Invariant"
+        if: always()
+        run: |
+          python3 scripts/enforce_row_height_21px.py

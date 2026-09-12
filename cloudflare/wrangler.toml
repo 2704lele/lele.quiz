@@ -1,0 +1,18 @@
+name = "lele-quiz-scheduler"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Exclusive Cron Triggers (17:01 UTC = 00:01 GMT+7, 20:01 UTC = 03:01 GMT+7, 22:01 UTC = 05:01 GMT+7)
+[triggers]
+crons = [
+  "1 17 * * *",
+  "1 20 * * *",
+  "1 22 * * *"
+]
+
+[vars]
+GITHUB_REPO_OWNER = "nwtuanhoang-coder"
+GITHUB_REPO_NAME = "lele-quiz-automation"
+TELEGRAM_CHAT_ID = "1187577977"
+TIMEZONE = "Asia/Ho_Chi_Minh"

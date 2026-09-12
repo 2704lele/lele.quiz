@@ -1,0 +1,76 @@
+# ==============================================================================
+# LELE QUIZ PIPELINE — STRICT ZERO-LEAK .GITIGNORE (STRUCTURE COMPLIANT)
+# ==============================================================================
+
+# Credentials, Secrets & Tokens (RAM-Only Vault Policy)
+configs/*.json
+configs/*.env
+configs/*.pem
+configs/*.key
+**/configs/*.json
+**/configs/*.env
+*.env
+*.env*
+.env
+.env*
+service_account.json
+**/service_account.json
+oauth_credentials.json
+**/oauth_credentials.json
+project_vault.enc
+.agents_vault.json
+user_oauth2.json
+cookies.txt
+
+# Allow standard metadata & config files
+!gdrive_folder_map.json
+!devcontainer.json
+!package.json
+!tsconfig.json
+
+# Python Cache & Runtime Artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+**/.pytest_cache/
+
+# Snapshots, Backups & Temp files
+*.db.gz
+*.log.gz
+*.tmp
+*.bak
+artifacts/*.json.gz
+
+# Render & Video Outputs
+output/
+**/output/
+media/
+**/media/
+scratch/
+**/scratch/
+*.mp4
+*.mov
+*.wav
+*.mp3
+!**/assets/audio/*.mp3
+!**/assets/fonts/*.ttf
+!**/assets/images/*.png
+!**/assets/images/*.jpg
+!**/assets/images/*.mp4
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+.agents/
+
+# Local artifacts
+artifacts/
+**/artifacts/
+*.gz
+**/*.gz
