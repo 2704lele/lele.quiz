@@ -80,7 +80,10 @@ def execute_with_backoff(
     for attempt in range(1, max_retries + 1):
         try:
             if hasattr(request_or_callable, "execute"):
-                return request_or_callable.execute(num_retries=2)
+                try:
+                    return request_or_callable.execute(num_retries=2)
+                except TypeError:
+                    return request_or_callable.execute()
             elif callable(request_or_callable):
                 return request_or_callable()
             else:
@@ -236,9 +239,25 @@ class RowHeightEnforcer:
         )
 
 
+def enforce_all_tabs_21px(
+    service: Optional[Any] = None, spreadsheet_id: str = SPREADSHEET_ID
+) -> Dict[str, Any]:
+    """
+    Enforces 21px row height on all rows across all 4 quiz tabs.
+    Adheres to PROJECT.md interface contract.
+    """
+    return audit_and_enforce_row_height(
+        target_height=TARGET_ROW_HEIGHT_PX,
+        spreadsheet_id=spreadsheet_id,
+        service=service,
+        force=True
+    )
+
+
 __all__ = [
     "RowHeightEnforcer",
     "audit_and_enforce_row_height",
+    "enforce_all_tabs_21px",
     "execute_with_backoff",
     "SPREADSHEET_ID",
     "TARGET_ROW_HEIGHT_PX",

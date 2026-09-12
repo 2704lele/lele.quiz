@@ -376,7 +376,7 @@ def main():
         parser.add_argument("--quality", type=str, default="qh", choices=["ql", "qm", "qh", "qk"], help="Render quality (default: qh 1080p60)")
         parser.add_argument("--upload-gdrive", action="store_true", help="Upload rendered video to Google Drive")
         parser.add_argument("--auto-qc", "--trigger-qc", dest="auto_qc", action="store_true", help="Automatically trigger ProductQC physical inspection after render")
-        parser.add_argument("--gdrive-folder-id", type=str, default=TARGET_GDRIVE_FOLDER_ID, help="Target Google Drive Folder ID (default: 1Y240J5-oXA-UDm2IKvp7qCBVsRempbCB)")
+        parser.add_argument("--gdrive-folder-id", type=str, default=TARGET_GDRIVE_FOLDER_ID, help=f"Target Google Drive Folder ID (default: {TARGET_GDRIVE_FOLDER_ID})")
 
         args = parser.parse_args()
 
