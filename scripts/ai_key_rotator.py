@@ -24,7 +24,7 @@ from typing import List, Dict, Any, Optional, Tuple
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
-GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-flash-latest"]
+GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.7-flash"]
 AGNES_MODELS = ["agnes-2.0-flash", "gpt-4o-mini"]
 DEFAULT_AGNES_BASE_URL = "https://apihub.agnes-ai.com/v1"
 
@@ -157,7 +157,7 @@ class AIKeyRotator:
                 )
 
                 try:
-                    with urllib.request.urlopen(req, timeout=25) as resp:
+                    with urllib.request.urlopen(req, timeout=45) as resp:
                         res_data = json.loads(resp.read().decode("utf-8"))
                         text = res_data["candidates"][0]["content"]["parts"][0]["text"]
                         parsed = self._extract_json(text)
