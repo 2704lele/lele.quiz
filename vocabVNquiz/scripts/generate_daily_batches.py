@@ -44,7 +44,7 @@ def get_vietnam_now_str() -> str:
 def send_telegram_alert(text: str):
     """Send Telegram notification."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "1187577977"
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "-1004392602002"
     if not (bot_token and chat_id):
         logger.warning("Telegram alert skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing.")
         return

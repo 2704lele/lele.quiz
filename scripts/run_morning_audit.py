@@ -268,7 +268,7 @@ def assert_canonical_drive_purity(
 
 def get_telegram_creds():
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "1187577977").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "-1004392602002").strip()
     env_file = os.path.expanduser("~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env")
     if not token and os.path.exists(env_file):
         try:

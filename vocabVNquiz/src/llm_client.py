@@ -433,7 +433,7 @@ def call_gemini_api(
             try:
                 from src.config import config
                 bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-                chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "1187577977"
+                chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "-1004392602002"
                 if bot_token and chat_id:
                     alert_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
                     requests.post(alert_url, json={

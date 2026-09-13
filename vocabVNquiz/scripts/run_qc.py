@@ -29,7 +29,7 @@ logger = logging.getLogger("AutoQCRunner")
 def send_telegram_qc_alert(text: str):
     """Send Auto-QC notification to Telegram bot."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "1187577977"
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "-1004392602002"
 
     if not (bot_token and chat_id):
         logger.warning("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing.")

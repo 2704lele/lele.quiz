@@ -20,7 +20,7 @@ from typing import List, Optional
 
 DEFAULT_REPO = ""
 DEFAULT_DRIVE_FOLDER = "1Y240J5-oXA-UDm2IKvp7qCBVsRempbCB"
-DEFAULT_CHAT_ID = "1187577977"
+DEFAULT_CHAT_ID = "-1004392602002"
 
 ALL_PIPELINES = ["pinyinquiz", "vocabCNquiz", "vocabVNquiz", "multilevelsquiz"]
 

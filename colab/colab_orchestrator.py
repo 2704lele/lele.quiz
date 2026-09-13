@@ -40,7 +40,7 @@ DEFAULT_OAUTH_PATH = Path.home() / ".cloud-profiles/lelehoctiengtrung/google_oau
 WORKER_SCRIPT = CURRENT_DIR / "colab_worker_quiz.py"
 
 DEFAULT_TELEGRAM_ENV_PATH = Path.home() / ".cloud-profiles/lelehoctiengtrung/telegram/telegram.env"
-DEFAULT_TELEGRAM_CHAT_ID = "1187577977"
+DEFAULT_TELEGRAM_CHAT_ID = "-1004392602002"
 
 
 def resolve_telegram_creds() -> Tuple[str, str]:

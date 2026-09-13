@@ -54,7 +54,7 @@ jobs:
 
           if [ -n "$TELEGRAM_TOKEN" ]; then
             echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
-            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT:-1187577977}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT:--1004392602002}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
             chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
           fi
 
@@ -62,7 +62,7 @@ jobs:
         id: run_audit
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '1187577977' }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '-1004392602002' }}
         run: |
           echo "🔍 Starting Morning Audit across 4 Quiz Tabs..."
           python3 scripts/run_morning_audit.py

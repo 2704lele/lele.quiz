@@ -42,7 +42,7 @@ def sanitize_filename(name: str) -> str:
 def send_telegram_alert_message(text: str, reply_markup: dict = None):
     """Send text alert to Telegram bot with optional inline keyboard."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "1187577977"
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "-1004392602002"
 
     if not (bot_token and chat_id):
         logger.warning("Telegram alert skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.")
@@ -69,7 +69,7 @@ def send_telegram_alert_message(text: str, reply_markup: dict = None):
 def send_telegram_video(video_path: str, caption: str, row_id: str = "", gdrive_link: str = "", thumb_path: str = "", thumb_gdrive_link: str = ""):
     """Send rendered video file directly to Telegram bot chat with moderation inline keyboard and high-CTR thumbnail."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "1187577977"
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip() or "-1004392602002"
 
     if not (bot_token and chat_id):
         logger.warning("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing.")
