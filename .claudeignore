@@ -1,0 +1,38 @@
+# Media & Heavy Render Artifacts
+media/
+**/media/
+output/
+**/output/
+scratch/
+**/scratch/
+artifacts/
+**/artifacts/
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+
+# Python Cache & Bytecode
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+
+# Agent conversation logs & internal state
+.agents/
+.git/
+
+# Credentials & secrets
+configs/*.json
+configs/*.env
+*.env
+service_account.json
+oauth_credentials.json
+project_vault.enc
+.agents_vault.json
+user_oauth2.json
+cookies.txt

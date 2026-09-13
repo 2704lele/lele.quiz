@@ -20,24 +20,55 @@ class GDriveUploader:
         self._authenticate()
 
     def _authenticate(self):
+        oauth_candidates = [
+            os.path.expanduser("~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json"),
+            os.path.join(config.base_dir, "configs", "oauth_credentials.json"),
+            os.path.join(config.base_dir, "..", "configs", "oauth_credentials.json"),
+        ]
+
+        env_oauth = os.getenv("GOOGLE_USER_OAUTH2_JSON") or os.getenv("GOOGLE_OAUTH_JSON")
+        if env_oauth and env_oauth.strip().startswith("{"):
+            try:
+                data = json.loads(env_oauth)
+                user_creds = UserCredentials(
+                    token=data.get("token") or data.get("access_token"),
+                    refresh_token=data.get("refresh_token"),
+                    token_uri=data.get("token_uri", "https://oauth2.googleapis.com/token"),
+                    client_id=data.get("client_id"),
+                    client_secret=data.get("client_secret")
+                )
+                user_creds.refresh(Request())
+                self.service = build("drive", "v3", credentials=user_creds)
+                logger.info("Google OAuth 2.0 User Authentication Successful from env!")
+                return
+            except Exception as e:
+                logger.warning(f"OAuth from env failed: {e}")
+
+        for oauth_file in oauth_candidates:
+            if oauth_file and os.path.exists(oauth_file) and os.path.getsize(oauth_file) > 10:
+                try:
+                    with open(oauth_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    user_creds = UserCredentials(
+                        token=data.get("token") or data.get("access_token"),
+                        refresh_token=data.get("refresh_token"),
+                        token_uri=data.get("token_uri", "https://oauth2.googleapis.com/token"),
+                        client_id=data.get("client_id"),
+                        client_secret=data.get("client_secret")
+                    )
+                    user_creds.refresh(Request())
+                    self.service = build("drive", "v3", credentials=user_creds)
+                    logger.info(f"Google OAuth 2.0 User Authentication Successful from {oauth_file}!")
+                    return
+                except Exception as e:
+                    logger.warning(f"OAuth attempt with {oauth_file} failed: {e}")
+
         client_id = os.getenv("GDRIVE_CLIENT_ID")
         client_secret = os.getenv("GDRIVE_CLIENT_SECRET")
         refresh_token = os.getenv("GDRIVE_REFRESH_TOKEN")
 
-        oauth_file = os.path.join(config.base_dir, "configs", "oauth_credentials.json")
-        if not (client_id and client_secret and refresh_token) and os.path.exists(oauth_file):
-            try:
-                with open(oauth_file, "r") as f:
-                    oauth_data = json.load(f)
-                    client_id = client_id or oauth_data.get("client_id")
-                    client_secret = client_secret or oauth_data.get("client_secret")
-                    refresh_token = refresh_token or oauth_data.get("refresh_token")
-            except Exception as e:
-                logger.warning(f"Could not read oauth_credentials.json: {e}")
-
         if client_id and client_secret and refresh_token:
             try:
-                logger.info("Authenticating via Google OAuth 2.0 User Credentials...")
                 user_creds = UserCredentials(
                     token=None,
                     refresh_token=refresh_token,
@@ -47,18 +78,19 @@ class GDriveUploader:
                 )
                 user_creds.refresh(Request())
                 self.service = build("drive", "v3", credentials=user_creds)
-                logger.info("Google OAuth 2.0 User Authentication Successful!")
+                logger.info("Google OAuth 2.0 User Authentication Successful from env vars!")
                 return
             except Exception as oe:
-                logger.error(f"Failed to authenticate via OAuth 2.0: {oe}. Falling back to Service Account...")
+                logger.warning(f"Failed to authenticate via OAuth env vars: {oe}")
 
+        # 2. Priority 2: Service Account Credentials (Fallback)
         scopes = [
             "https://www.googleapis.com/auth/drive",
             "https://www.googleapis.com/auth/drive.file"
         ]
 
-        env_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON") or os.getenv("SERVICE_ACCOUNT_JSON")
-        if env_json and env_json.strip():
+        env_json = os.getenv("GCP_SERVICE_ACCOUNT_KEY") or os.getenv("GCP_SERVICE_ACCOUNT_JSON") or os.getenv("SERVICE_ACCOUNT_JSON")
+        if env_json and env_json.strip().startswith("{"):
             try:
                 info = json.loads(env_json)
                 sa_creds = ServiceAccountCredentials.from_service_account_info(info, scopes=scopes)
@@ -70,10 +102,13 @@ class GDriveUploader:
 
         for path in config.creds_paths:
             if path and os.path.exists(path) and os.path.getsize(path) > 10:
-                sa_creds = ServiceAccountCredentials.from_service_account_file(path, scopes=scopes)
-                self.service = build("drive", "v3", credentials=sa_creds)
-                logger.info(f"Authenticated via Service Account file: {path}")
-                return
+                try:
+                    sa_creds = ServiceAccountCredentials.from_service_account_file(path, scopes=scopes)
+                    self.service = build("drive", "v3", credentials=sa_creds)
+                    logger.info(f"Authenticated via Service Account file: {path}")
+                    return
+                except Exception as e:
+                    logger.warning(f"Service Account file {path} failed: {e}")
 
         raise RuntimeError("Could not authenticate Google Drive client via any credentials!")
 
@@ -110,7 +145,7 @@ class GDriveUploader:
             except Exception as pe:
                 logger.warning(f"Warning setting permission for file {file_id}: {pe}")
 
-            web_link = file.get("webViewLink") or f"https://drive.google.com/file/d/{file_id}/view?usp=drivesdk"
+            web_link = f"https://drive.google.com/file/d/{file_id}/view?usp=drivesdk"
             logger.info(f"Uploaded '{filename}' to GDrive folder {self.folder_id} -> {web_link}")
             return web_link
         except Exception as e:

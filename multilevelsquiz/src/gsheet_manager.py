@@ -156,9 +156,32 @@ class GSheetManager:
         """Retrieve a specific row by ID (# column or row index) formatted for QC / Runner."""
         clean_target = str(target_id).replace("#", "").strip()
         rows = self.get_all_rows()
+        # First priority: match on _row_number
+        for r in rows:
+            if str(r.get("_row_number", "")) == clean_target:
+                levels = []
+                for idx in range(1, 6):
+                    w_key = f"Word {idx}"
+                    w_val = str(r.get(w_key, "")).strip()
+                    levels.append(self.parse_level_entry(w_val, idx))
+
+                row_idx = r.get("_row_number", 2)
+                return {
+                    "row_index": row_idx,
+                    "id": str(r.get("#", str(row_idx))).replace("#", "").strip(),
+                    "topic": r.get("Topic", "1 Nghĩa - 5 Cấp Độ"),
+                    "level": r.get("Level", "HSK 1-5"),
+                    "levels": levels,
+                    "video_url": r.get("Video", ""),
+                    "metadata": r.get("metadata", ""),
+                    "notes": r.get("Notes", ""),
+                    "raw_data": r
+                }
+
+        # Second priority: match on # column
         for r in rows:
             r_id = str(r.get("#", "")).replace("#", "").strip()
-            if r_id == clean_target or str(r.get("_row_number", "")) == clean_target:
+            if r_id == clean_target:
                 levels = []
                 for idx in range(1, 6):
                     w_key = f"Word {idx}"

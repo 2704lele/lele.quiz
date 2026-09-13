@@ -151,17 +151,9 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = str(r.get(w_key, "")).strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0] if len(parts) > 0 else ""
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 and len(parts) >= 4 else ""
-                        meaning = parts[3] if len(parts) >= 4 else (parts[2] if len(parts) > 2 else hanzi)
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        w = self.parse_word_entry(w_val)
+                        if w.get("hanzi"):
+                            words.append(w)
 
                 row_idx = r.get("_row_number", 2)
                 matching_batches.append({
@@ -190,17 +182,9 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = str(r.get(w_key, "")).strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0] if len(parts) > 0 else ""
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 and len(parts) >= 4 else ""
-                        meaning = parts[3] if len(parts) >= 4 else (parts[2] if len(parts) > 2 else hanzi)
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        w = self.parse_word_entry(w_val)
+                        if w.get("hanzi"):
+                            words.append(w)
 
                 row_idx = r.get("_row_number", 2)
                 return {
@@ -277,6 +261,15 @@ class GSheetManager:
         else:
             hidden_pinyin = ""
             meaning = hanzi
+
+        # Ensure pinyin has 1:1 syllables matching hanzi count
+        if hanzi and pinyin and len(pinyin.split()) != len(hanzi):
+            try:
+                from src.pinyin_utils import hanzi_to_full_pinyin
+                pinyin = hanzi_to_full_pinyin(hanzi)
+            except Exception:
+                pass
+
         return {
             "hanzi": hanzi,
             "pinyin": pinyin,

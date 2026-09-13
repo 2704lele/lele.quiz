@@ -372,7 +372,7 @@ def main():
         parser = argparse.ArgumentParser(description="lelehoctiengtrung_pinyin Batch Runner (Pipeline 2.0)")
         parser.add_argument("--from-sheet", action="store_true", help="Fetch batches from Google Sheets")
         parser.add_argument("--sample", action="store_true", help="Run with built-in sample batch")
-        parser.add_argument("--row-id", type=str, default=None, help="Process a specific row ID from Sheet")
+        parser.add_argument("--row-id", "--row_id", dest="row_id", type=str, default=None, help="Process a specific row ID from Sheet")
         parser.add_argument("--quality", type=str, default="qh", choices=["ql", "qm", "qh", "qk"], help="Render quality (default: qh 1080p60)")
         parser.add_argument("--upload-gdrive", action="store_true", help="Upload rendered video to Google Drive")
         parser.add_argument("--auto-qc", "--trigger-qc", dest="auto_qc", action="store_true", help="Automatically trigger ProductQC physical inspection after render")

@@ -101,7 +101,7 @@ def run_multilevels_batch(batch_id: str, quality: str = "qh", force: bool = Fals
 
     # 5. Upload Video to Google Drive
     uploader = GDriveUploader()
-    gdrive_link = uploader.upload_file(video_path, filename=output_filename, subfolder_name="multilevelsquiz")
+    gdrive_link = uploader.upload_file(video_path, filename=output_filename)
 
     # 6. Save Metadata & Update Google Sheet to 'Video'
     now_vn = get_vietnam_now_str()

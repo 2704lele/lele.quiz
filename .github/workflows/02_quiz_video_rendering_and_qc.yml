@@ -1,6 +1,8 @@
 name: "02 - Quiz Video Rendering & Auto-QC (Gatekeeper 2 QC)"
 
 on:
+  schedule:
+    - cron: '30 18,22,2,6,10,14 * * *'
   workflow_dispatch:
     inputs:
       tab:

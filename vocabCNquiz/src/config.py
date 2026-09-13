@@ -14,7 +14,7 @@ class AppConfig:
     sheet_tab_name: str = "vocabCN"
 
     # Shared Google Drive target folder
-    gdrive_target_folder: str = "1Y240J5-oXA-UDm2IKvp7qCBVsRempbCB"
+    gdrive_target_folder: str = "1eI7I4jQqGBjD7MC_NXJ4zwFANxrcZM1E"
     gdrive_subfolder: str = "vocabCNquiz"
 
     # Credential Paths

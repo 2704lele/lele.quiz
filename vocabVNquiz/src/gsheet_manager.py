@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import json
 import logging
@@ -151,17 +152,9 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = str(r.get(w_key, "")).strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0] if len(parts) > 0 else ""
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 and len(parts) >= 4 else ""
-                        meaning = parts[3] if len(parts) >= 4 else (parts[2] if len(parts) > 2 else hanzi)
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        w = self.parse_word_entry(w_val)
+                        if w.get("hanzi"):
+                            words.append(w)
 
                 row_idx = r.get("_row_number", 2)
                 matching_batches.append({
@@ -190,17 +183,9 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = str(r.get(w_key, "")).strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0] if len(parts) > 0 else ""
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 and len(parts) >= 4 else ""
-                        meaning = parts[3] if len(parts) >= 4 else (parts[2] if len(parts) > 2 else hanzi)
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        w = self.parse_word_entry(w_val)
+                        if w.get("hanzi"):
+                            words.append(w)
 
                 row_idx = r.get("_row_number", 2)
                 return {
@@ -259,21 +244,37 @@ class GSheetManager:
         return target_row
 
     def parse_word_entry(self, word_raw: str) -> Dict[str, str]:
-        """Parse 'hanzi | pinyin | hidden_pinyin | meaning' format."""
+        """Parse 'hanzi | pinyin | meaning' or reverse 'meaning | pinyin | hanzi' format."""
         if not word_raw:
             return {"hanzi": "", "pinyin": "", "hidden_pinyin": "", "meaning": ""}
         parts = [p.strip() for p in word_raw.split("|")]
-        hanzi = parts[0] if len(parts) > 0 else ""
-        pinyin = parts[1] if len(parts) > 1 else ""
-        if len(parts) >= 4:
-            hidden_pinyin = parts[2]
-            meaning = parts[3]
-        elif len(parts) == 3:
-            hidden_pinyin = ""
-            meaning = parts[2]
+        chinese_regex = re.compile(r'[\u4e00-\u9fff]')
+        if len(parts) == 3:
+            p0, p1, p2 = parts[0], parts[1], parts[2]
+            if chinese_regex.search(p2) and not chinese_regex.search(p0):
+                hanzi, pinyin, hidden_pinyin, meaning = p2, p1, "", p0
+            else:
+                hanzi, pinyin, hidden_pinyin, meaning = p0, p1, "", p2
+        elif len(parts) >= 4:
+            p0, p1, p2, p3 = parts[0], parts[1], parts[2], parts[3]
+            if chinese_regex.search(p3) and not chinese_regex.search(p0):
+                hanzi, pinyin, hidden_pinyin, meaning = p3, p1, p2, p0
+            else:
+                hanzi, pinyin, hidden_pinyin, meaning = p0, p1, p2, p3
         else:
+            hanzi = parts[0] if len(parts) > 0 else ""
+            pinyin = parts[1] if len(parts) > 1 else ""
             hidden_pinyin = ""
             meaning = hanzi
+
+        # Ensure pinyin has 1:1 syllables matching hanzi count
+        if hanzi and pinyin and len(pinyin.split()) != len(hanzi):
+            try:
+                from src.pinyin_utils import hanzi_to_full_pinyin
+                pinyin = hanzi_to_full_pinyin(hanzi)
+            except Exception:
+                pass
+
         return {
             "hanzi": hanzi,
             "pinyin": pinyin,

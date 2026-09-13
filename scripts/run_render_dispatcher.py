@@ -26,9 +26,13 @@ PIPELINE_MAP = {
     "pinyin": "pinyinquiz",
     "pinyinquiz": "pinyinquiz",
     "vocabcn": "vocabCNquiz",
+    "vocabCN": "vocabCNquiz",
     "vocabcnquiz": "vocabCNquiz",
+    "vocabCNquiz": "vocabCNquiz",
     "vocabvn": "vocabVNquiz",
+    "vocabVN": "vocabVNquiz",
     "vocabvnquiz": "vocabVNquiz",
+    "vocabVNquiz": "vocabVNquiz",
     "multilevels": "multilevelsquiz",
     "multilevelsquiz": "multilevelsquiz",
     "all": "all",
@@ -81,10 +85,17 @@ def dispatch_via_gha(tab: str, row: str, quality: str) -> bool:
         return False
 
 
-def execute_rendering_in_gha(tab: str, row: str, quality: str) -> bool:
+def execute_rendering_in_gha(tab: str, row: str, quality: str, dry_run: bool = False) -> bool:
     """Executes rendering batch and QC locally inside GitHub Actions runner."""
-    targets = ["pinyinquiz", "vocabCNquiz", "vocabVNquiz", "multilevelsquiz"] if tab == "all" else [PIPELINE_MAP.get(tab, tab)]
+    tab_lower = tab.strip().lower()
+    if tab_lower == "all":
+        targets = ["pinyinquiz", "vocabCNquiz", "vocabVNquiz", "multilevelsquiz"]
+    else:
+        target_name = PIPELINE_MAP.get(tab, PIPELINE_MAP.get(tab_lower, tab))
+        targets = [target_name]
+
     overall_success = True
+    clean_row = str(row).replace("#", "").strip() if row else ""
 
     for p in targets:
         pipe_dir = os.path.join(QUIZ_ROOT, p)
@@ -95,52 +106,141 @@ def execute_rendering_in_gha(tab: str, row: str, quality: str) -> bool:
             print(f"⚠ Batch script not found for pipeline {p}: {batch_script}")
             continue
 
-        cmd = [sys.executable, batch_script, "--from-sheet", "--quality", quality, "--upload-gdrive"]
-        if row:
-            cmd.extend(["--row-id", row])
+        # Case 1: pinyinquiz
+        if p == "pinyinquiz":
+            cmd = [sys.executable, batch_script, "--from-sheet", "--quality", quality, "--upload-gdrive"]
+            if clean_row:
+                cmd.extend(["--row-id", clean_row])
 
-        print(f"\n🎬 Running batch render for pipeline '{p}'...")
-        res = subprocess.run(cmd, cwd=pipe_dir)
-        if res.returncode != 0:
-            overall_success = False
-            print(f"❌ Render batch failed for {p}")
+            if dry_run:
+                print(f"[DRY-RUN] [{p}] Would run batch render: {' '.join(cmd)}")
+            else:
+                print(f"\n🎬 Running batch render for pipeline '{p}'...")
+                res = subprocess.run(cmd, cwd=pipe_dir)
+                if res.returncode != 0:
+                    overall_success = False
+                    print(f"❌ Render batch failed for {p}")
 
-        if os.path.exists(qc_script):
-            print(f"🔍 Running Auto-QC for pipeline '{p}'...")
-            qc_cmd = [sys.executable, qc_script]
-            if row:
-                qc_cmd.extend(["--row-id", row])
-            qc_res = subprocess.run(qc_cmd, cwd=pipe_dir)
-            if qc_res.returncode != 0:
-                overall_success = False
-                print(f"❌ QC failed for {p}")
+            if os.path.exists(qc_script):
+                qc_cmd = [sys.executable, qc_script]
+                if clean_row:
+                    qc_cmd.extend(["--row-id", clean_row])
+                if dry_run:
+                    print(f"[DRY-RUN] [{p}] Would run Auto-QC: {' '.join(qc_cmd)}")
+                else:
+                    print(f"🔍 Running Auto-QC for pipeline '{p}'...")
+                    qc_res = subprocess.run(qc_cmd, cwd=pipe_dir)
+                    if qc_res.returncode != 0:
+                        overall_success = False
+                        print(f"❌ QC failed for {p}")
+
+        # Case 2: vocabCNquiz or vocabVNquiz
+        elif p in ["vocabCNquiz", "vocabVNquiz"]:
+            cmd = [sys.executable, batch_script, "--quality", quality]
+            if clean_row:
+                cmd.extend(["--row_id", clean_row])
+
+            if dry_run:
+                print(f"[DRY-RUN] [{p}] Would run batch render: {' '.join(cmd)}")
+            else:
+                print(f"\n🎬 Running batch render for pipeline '{p}'...")
+                res = subprocess.run(cmd, cwd=pipe_dir)
+                if res.returncode != 0:
+                    overall_success = False
+                    print(f"❌ Render batch failed for {p}")
+
+            if os.path.exists(qc_script):
+                qc_cmd = [sys.executable, qc_script]
+                if clean_row:
+                    qc_cmd.extend(["--row-id", clean_row])
+                if dry_run:
+                    print(f"[DRY-RUN] [{p}] Would run Auto-QC: {' '.join(qc_cmd)}")
+                else:
+                    print(f"🔍 Running Auto-QC for pipeline '{p}'...")
+                    qc_res = subprocess.run(qc_cmd, cwd=pipe_dir)
+                    if qc_res.returncode != 0:
+                        overall_success = False
+                        print(f"❌ QC failed for {p}")
+
+        # Case 3: multilevelsquiz
+        elif p == "multilevelsquiz":
+            if clean_row:
+                target_ids = [clean_row]
+            else:
+                target_ids = []
+                try:
+                    from multilevelsquiz.src.gsheet_manager import GSheetManager as MLGSheetManager
+                    mgr = MLGSheetManager()
+                    pending = mgr.get_pending_batches()
+                    target_ids = [
+                        str(b.get("_row_number", b.get("row_index", b.get("#", "")))).replace("#", "").strip()
+                        for b in pending
+                    ]
+                    target_ids = [t for t in target_ids if t]
+                    print(f"Pending scan for multilevelsquiz found {len(target_ids)} batch(es): {target_ids}")
+                except Exception as e:
+                    print(f"Warning: could not auto-fetch pending multilevels batches: {e}")
+                    target_ids = []
+
+            if not target_ids:
+                print(f"ℹ No target rows to process for multilevelsquiz.")
+            else:
+                for tid in target_ids:
+                    cmd = [sys.executable, batch_script, "--id", tid, "--quality", quality, "--force"]
+                    if dry_run:
+                        print(f"[DRY-RUN] [multilevelsquiz] Would run batch render for row #{tid}: {' '.join(cmd)}")
+                    else:
+                        print(f"\n🎬 Running batch render for multilevelsquiz row #{tid}...")
+                        res = subprocess.run(cmd, cwd=pipe_dir)
+                        if res.returncode != 0:
+                            overall_success = False
+                            print(f"❌ Render batch failed for multilevelsquiz row #{tid}")
+                            continue
+
+                    if os.path.exists(qc_script):
+                        qc_cmd = [sys.executable, qc_script, "--id", tid]
+                        if dry_run:
+                            print(f"[DRY-RUN] [multilevelsquiz] Would run Auto-QC for row #{tid}: {' '.join(qc_cmd)}")
+                        else:
+                            print(f"🔍 Running Auto-QC for multilevelsquiz row #{tid}...")
+                            qc_res = subprocess.run(qc_cmd, cwd=pipe_dir)
+                            if qc_res.returncode != 0:
+                                overall_success = False
+                                print(f"❌ QC failed for multilevelsquiz row #{tid}")
 
     return overall_success
 
 
 def main():
     parser = argparse.ArgumentParser(description="Quiz Render Dispatcher")
-    parser.add_argument("--tab", "-t", default="all", choices=["all", "pinyin", "vocabCN", "vocabVN", "multilevels", "pinyinquiz", "vocabCNquiz", "vocabVNquiz", "multilevelsquiz"])
+    parser.add_argument("--tab", "-t", default="all", choices=[
+        "all", "pinyin", "vocabCN", "vocabVN", "multilevels",
+        "pinyinquiz", "vocabCNquiz", "vocabVNquiz", "multilevelsquiz",
+        "vocabcn", "vocabvn"
+    ])
     parser.add_argument("--row", "-r", default="", help="Specific Row ID or empty for all pending")
     parser.add_argument("--quality", "-q", default="qh", choices=["ql", "qm", "qh", "qk"])
+    parser.add_argument("--local", action="store_true", help="Execute rendering locally instead of dispatching to GitHub Actions")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate execution without running renders")
     args = parser.parse_args()
 
     print(f"🎬 === Starting Quiz Video Render Dispatcher (Tab: {args.tab}, Row: {args.row or 'ALL_PENDING'}, Quality: {args.quality}) ===")
 
-    in_gha = os.getenv("GITHUB_ACTIONS") == "true"
+    in_gha = os.getenv("GITHUB_ACTIONS") == "true" or args.local or args.dry_run
 
     if not in_gha:
         success = dispatch_via_gha(tab=args.tab, row=args.row, quality=args.quality)
     else:
-        success = execute_rendering_in_gha(tab=args.tab, row=args.row, quality=args.quality)
+        success = execute_rendering_in_gha(tab=args.tab, row=args.row, quality=args.quality, dry_run=args.dry_run)
 
-    print("\n📏 Enforcing strict 21px row height invariant across all tabs...")
-    try:
-        enforcer = RowHeightEnforcer()
-        enforcer.enforce_all()
-        print("✓ 21px Row Height Invariant successfully enforced.")
-    except Exception as e:
-        print(f"⚠ Warning: Could not run row height enforcer: {e}")
+    if not args.dry_run:
+        print("\n📏 Enforcing strict 21px row height invariant across all tabs...")
+        try:
+            enforcer = RowHeightEnforcer()
+            enforcer.enforce_all()
+            print("✓ 21px Row Height Invariant successfully enforced.")
+        except Exception as e:
+            print(f"⚠ Warning: Could not run row height enforcer: {e}")
 
     if success:
         print("🎉 Render Dispatcher Finished Successfully!")

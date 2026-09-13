@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import gspread
 from google.oauth2.service_account import Credentials
 from src.config import config
+from src.pinyin_utils import pinyin_to_hidden_pinyin
 
 logger = logging.getLogger("GSheetManager")
 
@@ -146,17 +147,7 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = row_dict.get(w_key, "").strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0]
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 else ""
-                        meaning = parts[3] if len(parts) > 3 else ""
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        words.append(self.parse_word_entry(w_val))
 
                 pending_batches.append({
                     "row_index": row_idx,
@@ -198,17 +189,7 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = row_dict.get(w_key, "").strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0]
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 else ""
-                        meaning = parts[3] if len(parts) > 3 else ""
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        words.append(self.parse_word_entry(w_val))
 
                 matching_batches.append({
                     "row_index": row_idx,
@@ -251,17 +232,7 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = row_dict.get(w_key, "").strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0]
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 else ""
-                        meaning = parts[3] if len(parts) > 3 else ""
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        words.append(self.parse_word_entry(w_val))
 
                 return {
                     "row_index": row_idx,
@@ -284,17 +255,7 @@ class GSheetManager:
                     w_key = f"Word {w_idx}"
                     w_val = row_dict.get(w_key, "").strip()
                     if w_val:
-                        parts = [p.strip() for p in w_val.split("|")]
-                        hanzi = parts[0]
-                        pinyin = parts[1] if len(parts) > 1 else ""
-                        hidden = parts[2] if len(parts) > 2 else ""
-                        meaning = parts[3] if len(parts) > 3 else ""
-                        words.append({
-                            "hanzi": hanzi,
-                            "pinyin": pinyin,
-                            "hidden_pinyin": hidden,
-                            "meaning": meaning or hanzi
-                        })
+                        words.append(self.parse_word_entry(w_val))
 
                 return {
                     "row_index": row_idx,
@@ -340,7 +301,7 @@ class GSheetManager:
                 logger.error(f"Failed to update {platform} for row {row_index}: {e}")
 
     def parse_word_entry(self, word_raw: str) -> Dict[str, str]:
-        """Parse 'hanzi | pinyin | hidden_pinyin | meaning' format."""
+        """Parse 'hanzi | pinyin | hidden_pinyin | meaning' or 'hanzi | pinyin | meaning' format."""
         if not word_raw:
             return {"hanzi": "", "pinyin": "", "hidden_pinyin": "", "meaning": ""}
         parts = [p.strip() for p in word_raw.split("|")]
@@ -352,14 +313,32 @@ class GSheetManager:
         elif len(parts) == 3:
             hidden_pinyin = ""
             meaning = parts[2]
+        elif len(parts) == 2:
+            hidden_pinyin = ""
+            meaning = hanzi
         else:
             hidden_pinyin = ""
             meaning = hanzi
+
+        # Ensure multi-character hanzi with unspaced pinyin is segmented into syllables
+        if " " not in pinyin and len(hanzi) > 1:
+            try:
+                from src.pre_render_validator import PINYIN_SYL_REGEX
+                matched = PINYIN_SYL_REGEX.findall(pinyin)
+                if matched and len(matched) == len(hanzi):
+                    pinyin = " ".join(matched)
+            except Exception:
+                pass
+
+        # Auto-compute hidden_pinyin from pinyin if missing or not formatted with underscores
+        if (not hidden_pinyin or "_" not in hidden_pinyin) and pinyin:
+            hidden_pinyin = pinyin_to_hidden_pinyin(pinyin)
+
         return {
             "hanzi": hanzi,
             "pinyin": pinyin,
             "hidden_pinyin": hidden_pinyin,
-            "meaning": meaning
+            "meaning": meaning or hanzi
         }
 
 if __name__ == "__main__":
