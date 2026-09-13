@@ -41,6 +41,7 @@ from scripts.linguistic_qc import (
     PinyinLinguisticValidator,
     MultilevelsEscalationValidator,
     is_dummy_word,
+    normalize_pinyin_spacing,
 )
 
 SPREADSHEET_ID = "1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0"
@@ -319,13 +320,16 @@ def ideate_pinyin(
     print(f"  Current rows: {len(records)-1}, Recent 50 tracked: {len(recent_50)} chars")
 
     sys_prompt = (
-        "Bạn là chuyên gia giáo dục Hán ngữ của kênh 'Lê Lê Học Tiếng Trung'. "
-        "Nhiệm vụ: Tạo các bộ câu hỏi trắc nghiệm phát âm Pinyin HSK 1-3 cực kỳ chuẩn xác, hấp dẫn, gần gũi. "
+        "Bạn là chuyên gia ngôn ngữ tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
+        "Nhiệm vụ: Tạo các bộ câu hỏi trắc nghiệm phát âm Pinyin (Pinyin Quiz). "
+        "Mỗi câu hỏi có 1 chữ Hán, 1 phiên âm Pinyin chuẩn và nghĩa tiếng Việt ngắn gọn. "
+        "Quy tắc Pinyin: Bắt buộc có dấu cách giữa các âm tiết tương ứng từng chữ Hán (ví dụ: 'mǐ fàn', 'píng guǒ', 'fēi jī'). "
         "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề tiếng Việt\", \"level\": \"HSK 2\", "
-        "\"words\": [{\"hanzi\": \"书\", \"pinyin\": \"shū\", \"meaning\": \"sách\"}]}]"
+        "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píng guǒ\", \"meaning\": \"quả táo\"}]}]"
     )
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Pinyin khác biệt hoàn toàn, mỗi chủ đề gồm đúng 5 từ vựng HSK 1-3. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Pinyin, mỗi chủ đề gồm 5 từ vựng HSK 1-3 thông dụng. "
+        f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
@@ -354,7 +358,7 @@ def ideate_pinyin(
                 print(f"  ⚠ [Gatekeeper 1 QC] Batch #{i+1} has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin chuẩn xác gồm đúng 5 từ vựng HSK 1-3. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề Pinyin chuẩn xác gồm đúng 5 từ vựng HSK 1-3 (Pinyin có dấu cách như 'mǐ fàn'). Tránh các chữ: {matrix.get_recent_50_tracked()}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -366,7 +370,7 @@ def ideate_pinyin(
             has_dummy = False
             for w in raw_words[:5]:
                 hz = w.get("hanzi", "").strip()
-                py = w.get("pinyin", "").strip()
+                py = normalize_pinyin_spacing(hz, w.get("pinyin", "").strip())
                 mn = w.get("meaning", "").strip()
                 if is_dummy_word(hz, py, mn):
                     has_dummy = True
@@ -462,11 +466,13 @@ def ideate_vocabcn(
     sys_prompt = (
         "Bạn là biên tập viên tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
         "Nhiệm vụ: Tạo các bộ trắc nghiệm Đoán Nghĩa Tiếng Việt từ chữ Hán (VocabCN Quiz). "
+        "Quy tắc Pinyin: Bắt buộc có dấu cách giữa các âm tiết tương ứng từng chữ Hán (ví dụ: 'píng guǒ', 'fēi jī'). "
         "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề tiếng Việt\", \"level\": \"HSK 2\", "
-        "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píngguǒ\", \"meaning\": \"quả táo\"}]}]"
+        "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píng guǒ\", \"meaning\": \"quả táo\"}]}]"
     )
     user_prompt = (
         f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt, mỗi chủ đề gồm 5 từ vựng HSK 2-3 hay gặp. "
+        f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
@@ -495,7 +501,7 @@ def ideate_vocabcn(
                 print(f"  ⚠ [Gatekeeper 1 QC] Batch #{i+1} has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm đúng 5 từ vựng HSK 2-3. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabCN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'píng guǒ'). Tránh các chữ: {matrix.get_recent_50_tracked()}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -507,7 +513,7 @@ def ideate_vocabcn(
             has_dummy = False
             for w in raw_words[:5]:
                 hz = w.get("hanzi", "").strip()
-                py = w.get("pinyin", "").strip()
+                py = normalize_pinyin_spacing(hz, w.get("pinyin", "").strip())
                 mn = w.get("meaning", "").strip()
                 if is_dummy_word(hz, py, mn):
                     has_dummy = True
@@ -603,11 +609,13 @@ def ideate_vocabvn(
     sys_prompt = (
         "Bạn là biên tập viên tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
         "Nhiệm vụ: Tạo các bộ trắc nghiệm Đoán Chữ Hán từ Nghĩa Tiếng Việt (VocabVN Quiz). "
+        "Quy tắc Pinyin: Bắt buộc có dấu cách giữa các âm tiết tương ứng từng chữ Hán (ví dụ: 'fēi jī', 'píng guǒ'). "
         "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề\", \"level\": \"HSK 2\", "
-        "\"words\": [{\"hanzi\": \"飞机\", \"pinyin\": \"fēijī\", \"meaning\": \"máy bay\"}]}]"
+        "\"words\": [{\"hanzi\": \"飞机\", \"pinyin\": \"fēi jī\", \"meaning\": \"máy bay\"}]}]"
     )
     user_prompt = (
         f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Chữ Hán, mỗi chủ đề gồm 5 từ vựng HSK 2-3 thông dụng. "
+        f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'fēi jī', 'mǐ fàn'). "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
@@ -636,7 +644,7 @@ def ideate_vocabvn(
                 print(f"  ⚠ [Gatekeeper 1 QC] Batch #{i+1} has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm đúng 5 từ vựng HSK 2-3. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabVN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'fēi jī'). Tránh các chữ: {matrix.get_recent_50_tracked()}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -648,7 +656,7 @@ def ideate_vocabvn(
             has_dummy = False
             for w in raw_words[:5]:
                 hz = w.get("hanzi", "").strip()
-                py = w.get("pinyin", "").strip()
+                py = normalize_pinyin_spacing(hz, w.get("pinyin", "").strip())
                 mn = w.get("meaning", "").strip()
                 if is_dummy_word(hz, py, mn):
                     has_dummy = True
@@ -829,11 +837,13 @@ def ideate_multilevels(
             norm_levels = []
             for lvl_idx, l in enumerate(raw_levels[:5]):
                 lvl_num = lvl_idx + 1
+                hz_str = l.get("hanzi", "").strip()
+                py_str = normalize_pinyin_spacing(hz_str, l.get("pinyin", "").strip())
                 norm_levels.append({
                     "level": lvl_num,
                     "hsk": l.get("hsk", f"HSK {lvl_num}"),
-                    "hanzi": l.get("hanzi", "").strip(),
-                    "pinyin": l.get("pinyin", "").strip(),
+                    "hanzi": hz_str,
+                    "pinyin": py_str,
                     "sino_vietnamese": (l.get("han_viet") or l.get("sino_vietnamese") or "").strip(),
                     "meaning": (l.get("meaning_vi") or l.get("meaning") or "").strip(),
                     "nuance": (l.get("nuance_note") or l.get("nuance") or "").strip(),

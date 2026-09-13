@@ -253,6 +253,28 @@ class GlobalHanziFrequencyMatrix:
         return True, overlap_ratio, overlap_list, "Passed Character Frequency QC."
 
 
+def normalize_pinyin_spacing(hanzi: str, pinyin_str: str) -> str:
+    """
+    Normalizes pinyin spacing to ensure 1:1 syllable match with multi-character Hanzi.
+    E.g. ('米饭', 'mǐfàn') -> 'mǐ fàn'
+    """
+    clean_hz = hanzi.strip()
+    clean_py = pinyin_str.strip()
+    if not clean_hz or not clean_py:
+        return clean_py
+    syls = clean_py.split()
+    if len(syls) == len(clean_hz):
+        return clean_py
+    try:
+        import pypinyin
+        auto_syls = [x[0] for x in pypinyin.pinyin(clean_hz, style=pypinyin.Style.TONE)]
+        if len(auto_syls) == len(clean_hz):
+            return " ".join(auto_syls)
+    except Exception:
+        pass
+    return clean_py
+
+
 class PinyinLinguisticValidator:
     """
     Pinyin Orthography, Tone Marks, Sandhi, Neutral Tone & Erhua Validator (F8, F9).
@@ -267,7 +289,7 @@ class PinyinLinguisticValidator:
         """
         errors: List[str] = []
         clean_hz = hanzi.strip()
-        clean_py = pinyin_str.strip()
+        clean_py = normalize_pinyin_spacing(clean_hz, pinyin_str.strip())
 
         if not clean_hz:
             return False, ["Hanzi text is empty."]
