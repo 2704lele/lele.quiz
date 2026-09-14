@@ -117,11 +117,26 @@ def is_dummy_word(hanzi: str, pinyin: str = "", meaning: str = "") -> bool:
     return False
 
 
+def normalize_topic_string(topic: str) -> str:
+    """Normalizes topic strings for canonical comparison and duplicate detection."""
+    if not topic:
+        return ""
+    t = str(topic).strip().lower()
+    t = re.sub(r"^1\s*nghĩa\s*5\s*cấp\s*[•\-\:\.]\s*", "", t)
+    t = re.sub(r"^1\s*nghĩa\s*5\s*cấp\s*", "", t)
+    t = t.replace("&", " và ")
+    t = re.sub(r"[\(\)\[\]\{\}\/\\,;:\.!\?•\-—_]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
 class GlobalHanziFrequencyMatrix:
     """
     Global Hanzi Character Frequency Matrix & Anti-Duplication Engine (F6, F7).
-    Aggregates Hanzi character occurrences across all 4 quiz tabs ('pinyin', 'vocabCN', 'vocabVN', 'multilevels'),
-    tracks the chronological sliding window of recent 50 tracked characters, and evaluates candidate batches.
+    - Tracks global and tab-isolated character frequency across all 4 quiz tabs ('pinyin', 'vocabCN', 'vocabVN', 'multilevels').
+    - Enforces Strict Zero-Duplicate Topic Name policy per tab.
+    - Enforces Exact Duplicate Hanzi Word rejection per tab.
+    - Enforces Tab-Isolated and Global Sliding Window Hanzi Character Overlap QC (< 35-40%).
     """
 
     def __init__(self, spreadsheet_client=None, spreadsheet_id: str = SPREADSHEET_ID):
@@ -129,12 +144,17 @@ class GlobalHanziFrequencyMatrix:
         self.spreadsheet_id = spreadsheet_id
         self.matrix: Dict[str, int] = {}
         self.tab_matrix: Dict[str, Dict[str, int]] = {t: {} for t in QUIZ_TABS}
+        self.tab_topics: Dict[str, Set[str]] = {t: set() for t in QUIZ_TABS}
+        self.tab_raw_topics: Dict[str, List[str]] = {t: [] for t in QUIZ_TABS}
+        self.tab_words: Dict[str, Set[str]] = {t: set() for t in QUIZ_TABS}
+        self.tab_recent_hanzi: Dict[str, List[str]] = {t: [] for t in QUIZ_TABS}
         self.recent_50_tracked: List[str] = []
         if self.client is not None:
             self._build_matrix()
 
-    def _extract_hanzi_from_row(self, tab: str, row: List[str]) -> List[str]:
-        """Extracts individual Hanzi characters from a spreadsheet row according to tab schema."""
+    def _extract_hanzi_and_words_from_row(self, tab: str, row: List[str]) -> Tuple[List[str], List[str]]:
+        """Extracts individual Hanzi words and characters from a spreadsheet row according to tab schema."""
+        words_list: List[str] = []
         hanzi_chars: List[str] = []
         for col_idx in range(4, min(9, len(row))):
             val = row[col_idx] if len(row) > col_idx else ""
@@ -149,13 +169,20 @@ class GlobalHanziFrequencyMatrix:
             elif tab == "multilevels":
                 target_str = parts[0] if parts else ""
 
-            for char in target_str:
-                if "\u4e00" <= char <= "\u9fff":
-                    hanzi_chars.append(char)
-        return hanzi_chars
+            if target_str:
+                words_list.append(target_str)
+                for char in target_str:
+                    if "\u4e00" <= char <= "\u9fff":
+                        hanzi_chars.append(char)
+        return words_list, hanzi_chars
+
+    def _extract_hanzi_from_row(self, tab: str, row: List[str]) -> List[str]:
+        """Backward-compatible wrapper extracting only individual Hanzi characters."""
+        _, chars = self._extract_hanzi_and_words_from_row(tab, row)
+        return chars
 
     def _build_matrix(self):
-        """Scans all 4 worksheets in the central spreadsheet to populate the frequency matrix and recent 50 chars."""
+        """Scans all 4 worksheets in the central spreadsheet to populate topic registries, word banks, and character matrices."""
         if self.client is None:
             return
 
@@ -175,13 +202,38 @@ class GlobalHanziFrequencyMatrix:
             except Exception:
                 rows = []
 
+            tab_char_list: List[str] = []
             for r in rows[1:]:
-                chars = self._extract_hanzi_from_row(tab, r)
+                # Extract Topic (Column B / index 1)
+                topic_val = r[1].strip() if len(r) > 1 else ""
+                if topic_val:
+                    norm_t = normalize_topic_string(topic_val)
+                    if norm_t:
+                        self.tab_topics[tab].add(norm_t)
+                    self.tab_raw_topics[tab].append(topic_val)
+
+                # Extract Words and Characters
+                words, chars = self._extract_hanzi_and_words_from_row(tab, r)
+                for w in words:
+                    self.tab_words[tab].add(w)
                 for c in chars:
                     self.matrix[c] = self.matrix.get(c, 0) + 1
                     self.tab_matrix[tab][c] = self.tab_matrix[tab].get(c, 0) + 1
+                    tab_char_list.append(c)
                     chrono_char_list.append(c)
 
+            # Build tab-isolated recent unique Hanzi characters (up to 100)
+            seen_tab: Set[str] = set()
+            tab_recent_unique: List[str] = []
+            for c in reversed(tab_char_list):
+                if c not in seen_tab:
+                    seen_tab.add(c)
+                    tab_recent_unique.append(c)
+                if len(tab_recent_unique) >= 100:
+                    break
+            self.tab_recent_hanzi[tab] = list(reversed(tab_recent_unique))
+
+        # Build global chronological recent unique characters (up to 50)
         seen: Set[str] = set()
         recent_unique: List[str] = []
         for c in reversed(chrono_char_list):
@@ -196,21 +248,73 @@ class GlobalHanziFrequencyMatrix:
         """Returns the list of the most recent unique Hanzi characters (up to 50) chronologically."""
         return list(self.recent_50_tracked)
 
-    def register_ingested_batch(self, tab: str, batch_words: List[Dict[str, Any]]):
+    def get_existing_topics(self, tab: str) -> List[str]:
+        """Returns the list of existing raw topic names for the specified tab."""
+        return list(self.tab_raw_topics.get(tab, []))
+
+    def get_tab_recent_50_tracked(self, tab: str, limit: int = 50) -> List[str]:
+        """Returns tab-isolated recent unique Hanzi characters (up to limit)."""
+        recent = self.tab_recent_hanzi.get(tab, [])
+        return list(recent[-limit:]) if recent else list(self.recent_50_tracked[-limit:])
+
+    def get_tab_existing_words(self, tab: str) -> Set[str]:
+        """Returns set of all existing Hanzi words for the specified tab."""
+        return set(self.tab_words.get(tab, set()))
+
+    def is_topic_duplicated(self, tab: str, topic: str) -> bool:
+        """Strict check if a topic name already exists in the given tab."""
+        if not topic or tab not in self.tab_topics:
+            return False
+        norm = normalize_topic_string(topic)
+        if not norm:
+            return False
+        if norm in self.tab_topics[tab]:
+            return True
+        for ext in self.tab_topics[tab]:
+            if norm == ext:
+                return True
+            if len(norm) >= 6 and len(ext) >= 6 and (norm == ext or norm in ext or ext in norm):
+                return True
+        return False
+
+    def register_ingested_batch(self, tab: str, batch_words: List[Dict[str, Any]], topic: str = ""):
         """
-        Incrementally registers a newly ingested batch into the frequency matrix and updates
-        the chronological sliding window without requiring a full spreadsheet re-read.
+        Incrementally registers a newly ingested batch into topic registries, word banks,
+        tab-isolated history, and the global sliding window.
         """
+        if topic and tab in self.tab_topics:
+            norm_t = normalize_topic_string(topic)
+            if norm_t:
+                self.tab_topics[tab].add(norm_t)
+            self.tab_raw_topics[tab].append(topic)
+
         new_chars: List[str] = []
         for w in batch_words:
-            hz = w.get("hanzi", "") if isinstance(w, dict) else str(w)
-            for c in hz:
-                if "\u4e00" <= c <= "\u9fff":
-                    self.matrix[c] = self.matrix.get(c, 0) + 1
-                    if tab in self.tab_matrix:
-                        self.tab_matrix[tab][c] = self.tab_matrix[tab].get(c, 0) + 1
-                    new_chars.append(c)
+            hz = w.get("hanzi", "").strip() if isinstance(w, dict) else str(w).strip()
+            if hz:
+                if tab in self.tab_words:
+                    self.tab_words[tab].add(hz)
+                for c in hz:
+                    if "\u4e00" <= c <= "\u9fff":
+                        self.matrix[c] = self.matrix.get(c, 0) + 1
+                        if tab in self.tab_matrix:
+                            self.tab_matrix[tab][c] = self.tab_matrix[tab].get(c, 0) + 1
+                        new_chars.append(c)
 
+        # Update tab-specific recent Hanzi
+        if tab in self.tab_recent_hanzi:
+            tab_combined = self.tab_recent_hanzi[tab] + new_chars
+            seen_tab: Set[str] = set()
+            tab_recent_unique: List[str] = []
+            for c in reversed(tab_combined):
+                if c not in seen_tab:
+                    seen_tab.add(c)
+                    tab_recent_unique.append(c)
+                if len(tab_recent_unique) >= 100:
+                    break
+            self.tab_recent_hanzi[tab] = list(reversed(tab_recent_unique))
+
+        # Update global recent Hanzi
         combined = self.recent_50_tracked + new_chars
         seen: Set[str] = set()
         recent_unique: List[str] = []
@@ -223,23 +327,55 @@ class GlobalHanziFrequencyMatrix:
         self.recent_50_tracked = list(reversed(recent_unique))
 
     def evaluate_candidate_batch(
-        self, batch_words: List[Dict[str, Any]], strict_zero: bool = False
+        self,
+        batch_words: List[Dict[str, Any]],
+        topic: str = "",
+        tab: str = "",
+        strict_zero: bool = False
     ) -> Tuple[bool, float, List[str], str]:
         """
-        Evaluates candidate batch against recent 50 tracked characters.
-        Rejects batch if overlap > 40% (or > 0% in strict zero mode).
+        Evaluates candidate batch against:
+        1. Strict Zero-Duplicate Topic policy.
+        2. Exact Duplicate Hanzi Word policy within tab.
+        3. Tab-Isolated Hanzi Character Overlap (< 35%).
+        4. Global Hanzi Character Overlap (< 40%).
         Returns (is_valid, overlap_ratio, overlap_list, reason).
         """
+        # 1. Topic Duplicate QC
+        if topic and tab:
+            if self.is_topic_duplicated(tab, topic):
+                return False, 1.0, [topic], f"Rejected (Duplicate Topic): Chủ đề '{topic}' đã tồn tại trong tab '{tab}'."
+
+        batch_words_set: Set[str] = set()
         batch_chars: Set[str] = set()
         for w in batch_words:
-            hz = w.get("hanzi", "") if isinstance(w, dict) else str(w)
-            for c in hz:
-                if "\u4e00" <= c <= "\u9fff":
-                    batch_chars.add(c)
+            hz = w.get("hanzi", "").strip() if isinstance(w, dict) else str(w).strip()
+            if hz:
+                batch_words_set.add(hz)
+                for c in hz:
+                    if "\u4e00" <= c <= "\u9fff":
+                        batch_chars.add(c)
 
         if not batch_chars:
             return False, 1.0, [], "Candidate batch contains no Hanzi characters."
 
+        # 2. Exact Word Duplicate QC within Tab
+        if tab and tab in self.tab_words:
+            duplicate_words = [w for w in batch_words_set if w in self.tab_words[tab]]
+            if duplicate_words:
+                return False, 1.0, duplicate_words, f"Rejected (Duplicate Word): Từ vựng {duplicate_words} đã xuất hiện trong lịch sử tab '{tab}'."
+
+        # 3. Tab-Isolated Hanzi Character Overlap QC
+        if tab and tab in self.tab_recent_hanzi:
+            tab_recent_set = set(self.tab_recent_hanzi[tab])
+            tab_overlap = batch_chars.intersection(tab_recent_set)
+            tab_ratio = len(tab_overlap) / len(batch_chars)
+            if strict_zero and len(tab_overlap) > 0:
+                return False, tab_ratio, sorted(list(tab_overlap)), f"Rejected (Strict Zero): Chứa {len(tab_overlap)} chữ Hán trùng với lịch sử gần nhất của tab '{tab}': {sorted(list(tab_overlap))}"
+            if tab_ratio > 0.35:
+                return False, tab_ratio, sorted(list(tab_overlap)), f"Rejected: Trùng {tab_ratio:.1%} chữ Hán với lịch sử gần nhất của tab '{tab}' (> 35% threshold): {sorted(list(tab_overlap))}"
+
+        # 4. Global Hanzi Character Overlap QC
         overlap = batch_chars.intersection(set(self.recent_50_tracked))
         overlap_ratio = len(overlap) / len(batch_chars)
         overlap_list = sorted(list(overlap))
@@ -248,9 +384,9 @@ class GlobalHanziFrequencyMatrix:
             return False, overlap_ratio, overlap_list, f"Rejected (Strict Zero): Contains {len(overlap)} characters from recent 50 tracked: {overlap_list}"
 
         if overlap_ratio > 0.40:
-            return False, overlap_ratio, overlap_list, f"Rejected: {overlap_ratio:.1%} overlap with recent 50 tracked characters (> 40% threshold): {overlap_list}"
+            return False, overlap_ratio, overlap_list, f"Rejected: {overlap_ratio:.1%} overlap with global recent 50 tracked characters (> 40% threshold): {overlap_list}"
 
-        return True, overlap_ratio, overlap_list, "Passed Character Frequency QC."
+        return True, 0.0, [], "Passed Character Frequency & Anti-Duplication QC."
 
 
 def normalize_pinyin_spacing(hanzi: str, pinyin_str: str) -> str:

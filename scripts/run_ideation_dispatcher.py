@@ -314,10 +314,11 @@ def ideate_pinyin(
 
     if matrix is None:
         matrix = GlobalHanziFrequencyMatrix(ss)
-    recent_50 = matrix.get_recent_50_tracked()
+    recent_50 = matrix.get_tab_recent_50_tracked("pinyin", limit=50)
+    existing_topics = matrix.get_existing_topics("pinyin")
 
     print(f"\n▶ [Ideation] Processing Tab 'pinyin' (Target: {count} batches)...")
-    print(f"  Current rows: {len(records)-1}, Recent 50 tracked: {len(recent_50)} chars")
+    print(f"  Current rows: {len(records)-1}, Tab Recent tracked: {len(recent_50)} chars, Existing Topics: {len(existing_topics)}")
 
     sys_prompt = (
         "Bạn là chuyên gia ngôn ngữ tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
@@ -327,38 +328,63 @@ def ideate_pinyin(
         "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề tiếng Việt\", \"level\": \"HSK 2\", "
         "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píng guǒ\", \"meaning\": \"quả táo\"}]}]"
     )
+    topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Pinyin, mỗi chủ đề gồm 5 từ vựng HSK 1-3 thông dụng. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Pinyin hoàn toàn mới lạ, mỗi chủ đề gồm 5 từ vựng HSK 1-3 thông dụng. "
         f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+        f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề đã có sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
     ai_data, provider = rotator.generate_quiz_ideas(sys_prompt, user_prompt)
     batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("topics") or [ai_data])
 
+    batches_pool = [b for b in batches if isinstance(b, dict)] if isinstance(batches, list) else []
     appended = 0
     max_retries = 3
+    attempt_count = 0
+    max_attempts = count * 4
 
-    for i, b in enumerate(batches[:count]):
-        if not isinstance(b, dict):
+    while appended < count and attempt_count < max_attempts:
+        attempt_count += 1
+        if not batches_pool:
+            remaining = count - appended
+            print(f"  ⚡ [Dispatcher] Requesting {remaining} additional candidate batch(es) to fulfill target of {count}...")
+            curr_topics = matrix.get_existing_topics("pinyin")
+            curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
+            ai_data, provider = rotator.generate_quiz_ideas(
+                sys_prompt,
+                f"Hãy tạo {remaining} chủ đề trắc nghiệm Pinyin hoàn toàn mới, mỗi chủ đề gồm 5 từ vựng HSK 1-3 thông dụng. "
+                f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+                f"Tuyệt đối KHÔNG tạo lại các chủ đề: [{curr_ban}]. "
+                f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('pinyin', limit=50)}."
+            )
+            more_batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("topics") or [ai_data])
+            if isinstance(more_batches, list):
+                batches_pool.extend([b for b in more_batches if isinstance(b, dict)])
+            if not batches_pool:
+                print(f"  ⚠ No more candidate batches returned by AI. Stopping.")
+                break
+
+        current_batch = batches_pool.pop(0)
+        if not isinstance(current_batch, dict):
             continue
 
-        current_batch = b
         valid_batch = False
         words = []
         topic = ""
         level = ""
 
         for attempt in range(max_retries):
-            topic = current_batch.get("topic", f"Chủ Đề Pinyin #{next_id + appended}")
+            topic = current_batch.get("topic", f"Chủ Đề Pinyin #{next_id + appended}").strip()
             level = current_batch.get("level", "HSK 2")
             raw_words = current_batch.get("words", [])
 
             if len(raw_words) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Batch #{i+1} has {len(raw_words)} words (< 5 required). Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Batch has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin chuẩn xác gồm đúng 5 từ vựng HSK 1-3 (Pinyin có dấu cách như 'mǐ fàn'). Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề Pinyin chuẩn xác gồm đúng 5 từ vựng HSK 1-3 (Pinyin có dấu cách như 'mǐ fàn'). Không trùng chủ đề [{', '.join(matrix.get_existing_topics('pinyin')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -378,10 +404,10 @@ def ideate_pinyin(
                 candidate_words.append({"hanzi": hz, "pinyin": py, "meaning": mn})
 
             if has_dummy or len(candidate_words) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Dummy/placeholder words detected in batch #{i+1}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Dummy/placeholder words detected in candidate batch. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin gồm đúng 5 từ vựng HSK 1-3 không dùng từ mẫu hay placeholder. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề Pinyin gồm đúng 5 từ vựng HSK 1-3 không dùng từ mẫu hay placeholder. Không trùng: [{', '.join(matrix.get_existing_topics('pinyin')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -389,12 +415,12 @@ def ideate_pinyin(
                         current_batch = ret_list[0]
                 continue
 
-            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words)
+            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words, topic=topic, tab="pinyin")
             if not is_valid_overlap:
-                print(f"  ⚠ [Gatekeeper 1 QC] Overlap check failed: {reason}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin gồm 5 từ vựng HSK 1-3 hoàn toàn mới. Tuyệt đối không dùng: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề Pinyin gồm 5 từ vựng HSK 1-3 hoàn toàn mới. Tuyệt đối không dùng chủ đề [{', '.join(matrix.get_existing_topics('pinyin')[-25:])}]. Tuyệt đối không dùng chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -413,7 +439,7 @@ def ideate_pinyin(
             if not pinyin_passed:
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin gồm 5 từ vựng chuẩn chỉnh âm điệu. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề Pinyin gồm 5 từ vựng chuẩn chỉnh âm điệu. Không trùng [{', '.join(matrix.get_existing_topics('pinyin')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -426,7 +452,7 @@ def ideate_pinyin(
             break
 
         if not valid_batch:
-            print(f"  ❌ [Gatekeeper 1 QC] Batch #{i+1} rejected after {max_retries} attempts to maintain spreadsheet purity.")
+            print(f"  ❌ [Gatekeeper 1 QC] Batch candidate rejected after {max_retries} attempts to maintain spreadsheet purity.")
             continue
 
         cur_id = next_id + appended
@@ -437,9 +463,9 @@ def ideate_pinyin(
         row_data = [rid, topic, level, "Pending"] + w_cols + [meta_txt, "", "", "", "", now_str, f"Tự động sinh bởi {provider} ({now_str} GMT+7)"]
         sanitized_row = validate_and_sanitize_row(row_data, expected_row_idx=cur_id)
         ws.append_row(sanitized_row)
-        matrix.register_ingested_batch("pinyin", words)
+        matrix.register_ingested_batch("pinyin", words, topic=topic)
         appended += 1
-        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid}: '{topic}' to tab 'pinyin'")
+        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid} ({appended}/{count}): '{topic}' to tab 'pinyin'")
     return appended
 
 
@@ -458,10 +484,11 @@ def ideate_vocabcn(
 
     if matrix is None:
         matrix = GlobalHanziFrequencyMatrix(ss)
-    recent_50 = matrix.get_recent_50_tracked()
+    recent_50 = matrix.get_tab_recent_50_tracked("vocabCN", limit=50)
+    existing_topics = matrix.get_existing_topics("vocabCN")
 
     print(f"\n▶ [Ideation] Processing Tab 'vocabCN' (Target: {count} batches)...")
-    print(f"  Current rows: {len(records)-1}, Recent 50 tracked: {len(recent_50)} chars")
+    print(f"  Current rows: {len(records)-1}, Tab Recent tracked: {len(recent_50)} chars, Existing Topics: {len(existing_topics)}")
 
     sys_prompt = (
         "Bạn là biên tập viên tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
@@ -470,38 +497,63 @@ def ideate_vocabcn(
         "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề tiếng Việt\", \"level\": \"HSK 2\", "
         "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píng guǒ\", \"meaning\": \"quả táo\"}]}]"
     )
+    topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt, mỗi chủ đề gồm 5 từ vựng HSK 2-3 hay gặp. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt hoàn toàn mới lạ, mỗi chủ đề gồm 5 từ vựng HSK 2-3 hay gặp. "
         f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+        f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề đã có sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
     ai_data, provider = rotator.generate_quiz_ideas(sys_prompt, user_prompt)
     batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("topics") or [ai_data])
 
+    batches_pool = [b for b in batches if isinstance(b, dict)] if isinstance(batches, list) else []
     appended = 0
     max_retries = 3
+    attempt_count = 0
+    max_attempts = count * 4
 
-    for i, b in enumerate(batches[:count]):
-        if not isinstance(b, dict):
+    while appended < count and attempt_count < max_attempts:
+        attempt_count += 1
+        if not batches_pool:
+            remaining = count - appended
+            print(f"  ⚡ [Dispatcher] Requesting {remaining} additional candidate batch(es) to fulfill target of {count}...")
+            curr_topics = matrix.get_existing_topics("vocabCN")
+            curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
+            ai_data, provider = rotator.generate_quiz_ideas(
+                sys_prompt,
+                f"Hãy tạo {remaining} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt hoàn toàn mới, mỗi chủ đề gồm 5 từ vựng HSK 2-3 hay gặp. "
+                f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+                f"Tuyệt đối KHÔNG tạo lại các chủ đề: [{curr_ban}]. "
+                f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('vocabCN', limit=50)}."
+            )
+            more_batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("topics") or [ai_data])
+            if isinstance(more_batches, list):
+                batches_pool.extend([b for b in more_batches if isinstance(b, dict)])
+            if not batches_pool:
+                print(f"  ⚠ No more candidate batches returned by AI. Stopping.")
+                break
+
+        current_batch = batches_pool.pop(0)
+        if not isinstance(current_batch, dict):
             continue
 
-        current_batch = b
         valid_batch = False
         words = []
         topic = ""
         level = ""
 
         for attempt in range(max_retries):
-            topic = current_batch.get("topic", f"Đoán Nghĩa Tiếng Việt #{next_id + appended}")
+            topic = current_batch.get("topic", f"Đoán Nghĩa Tiếng Việt #{next_id + appended}").strip()
             level = current_batch.get("level", "HSK 2")
             raw_words = current_batch.get("words", [])
 
             if len(raw_words) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Batch #{i+1} has {len(raw_words)} words (< 5 required). Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Batch has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'píng guǒ'). Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabCN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'píng guǒ'). Không trùng [{', '.join(matrix.get_existing_topics('vocabCN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabCN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -521,10 +573,10 @@ def ideate_vocabcn(
                 candidate_words.append({"hanzi": hz, "pinyin": py, "meaning": mn})
 
             if has_dummy or len(candidate_words) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Dummy/placeholder words detected in batch #{i+1}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Dummy/placeholder words detected in candidate batch. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng HSK 2-3 không dùng từ mẫu. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng HSK 2-3 không dùng từ mẫu. Không trùng: [{', '.join(matrix.get_existing_topics('vocabCN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabCN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -532,12 +584,12 @@ def ideate_vocabcn(
                         current_batch = ret_list[0]
                 continue
 
-            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words)
+            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words, topic=topic, tab="vocabCN")
             if not is_valid_overlap:
-                print(f"  ⚠ [Gatekeeper 1 QC] Overlap check failed: {reason}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng mới hoàn toàn. Tránh: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng mới hoàn toàn. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('vocabCN')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabCN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -556,7 +608,7 @@ def ideate_vocabcn(
             if not pinyin_passed:
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng chuẩn chỉnh âm điệu. Tránh: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng chuẩn chỉnh âm điệu. Không trùng [{', '.join(matrix.get_existing_topics('vocabCN')[-20:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabCN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -569,7 +621,7 @@ def ideate_vocabcn(
             break
 
         if not valid_batch:
-            print(f"  ❌ [Gatekeeper 1 QC] Batch #{i+1} rejected after {max_retries} attempts to maintain spreadsheet purity.")
+            print(f"  ❌ [Gatekeeper 1 QC] Batch candidate rejected after {max_retries} attempts to maintain spreadsheet purity.")
             continue
 
         cur_id = next_id + appended
@@ -580,9 +632,9 @@ def ideate_vocabcn(
         row_data = [rid, topic, level, "Pending"] + w_cols + [meta_txt, "", "", "", "", now_str, f"Tự động sinh bởi {provider} ({now_str} GMT+7)"]
         sanitized_row = validate_and_sanitize_row(row_data, expected_row_idx=cur_id)
         ws.append_row(sanitized_row)
-        matrix.register_ingested_batch("vocabCN", words)
+        matrix.register_ingested_batch("vocabCN", words, topic=topic)
         appended += 1
-        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid}: '{topic}' to tab 'vocabCN'")
+        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid} ({appended}/{count}): '{topic}' to tab 'vocabCN'")
     return appended
 
 
@@ -601,10 +653,11 @@ def ideate_vocabvn(
 
     if matrix is None:
         matrix = GlobalHanziFrequencyMatrix(ss)
-    recent_50 = matrix.get_recent_50_tracked()
+    recent_50 = matrix.get_tab_recent_50_tracked("vocabVN", limit=50)
+    existing_topics = matrix.get_existing_topics("vocabVN")
 
     print(f"\n▶ [Ideation] Processing Tab 'vocabVN' (Target: {count} batches)...")
-    print(f"  Current rows: {len(records)-1}, Recent 50 tracked: {len(recent_50)} chars")
+    print(f"  Current rows: {len(records)-1}, Tab Recent tracked: {len(recent_50)} chars, Existing Topics: {len(existing_topics)}")
 
     sys_prompt = (
         "Bạn là biên tập viên tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
@@ -613,38 +666,63 @@ def ideate_vocabvn(
         "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề\", \"level\": \"HSK 2\", "
         "\"words\": [{\"hanzi\": \"飞机\", \"pinyin\": \"fēi jī\", \"meaning\": \"máy bay\"}]}]"
     )
+    topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Chữ Hán, mỗi chủ đề gồm 5 từ vựng HSK 2-3 thông dụng. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Chữ Hán hoàn toàn mới lạ, mỗi chủ đề gồm 5 từ vựng HSK 2-3 thông dụng. "
         f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'fēi jī', 'mǐ fàn'). "
+        f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề đã có sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
     ai_data, provider = rotator.generate_quiz_ideas(sys_prompt, user_prompt)
     batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("topics") or [ai_data])
 
+    batches_pool = [b for b in batches if isinstance(b, dict)] if isinstance(batches, list) else []
     appended = 0
     max_retries = 3
+    attempt_count = 0
+    max_attempts = count * 4
 
-    for i, b in enumerate(batches[:count]):
-        if not isinstance(b, dict):
+    while appended < count and attempt_count < max_attempts:
+        attempt_count += 1
+        if not batches_pool:
+            remaining = count - appended
+            print(f"  ⚡ [Dispatcher] Requesting {remaining} additional candidate batch(es) to fulfill target of {count}...")
+            curr_topics = matrix.get_existing_topics("vocabVN")
+            curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
+            ai_data, provider = rotator.generate_quiz_ideas(
+                sys_prompt,
+                f"Hãy tạo {remaining} chủ đề trắc nghiệm Đoán Chữ Hán hoàn toàn mới, mỗi chủ đề gồm 5 từ vựng HSK 2-3 thông dụng. "
+                f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'fēi jī', 'mǐ fàn'). "
+                f"Tuyệt đối KHÔNG tạo lại các chủ đề: [{curr_ban}]. "
+                f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('vocabVN', limit=50)}."
+            )
+            more_batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("topics") or [ai_data])
+            if isinstance(more_batches, list):
+                batches_pool.extend([b for b in more_batches if isinstance(b, dict)])
+            if not batches_pool:
+                print(f"  ⚠ No more candidate batches returned by AI. Stopping.")
+                break
+
+        current_batch = batches_pool.pop(0)
+        if not isinstance(current_batch, dict):
             continue
 
-        current_batch = b
         valid_batch = False
         words = []
         topic = ""
         level = ""
 
         for attempt in range(max_retries):
-            topic = current_batch.get("topic", f"Đoán Hán Tự #{next_id + appended}")
+            topic = current_batch.get("topic", f"Đoán Hán Tự #{next_id + appended}").strip()
             level = current_batch.get("level", "HSK 2")
             raw_words = current_batch.get("words", [])
 
             if len(raw_words) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Batch #{i+1} has {len(raw_words)} words (< 5 required). Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Batch has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'fēi jī'). Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabVN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'fēi jī'). Không trùng [{', '.join(matrix.get_existing_topics('vocabVN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabVN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -664,10 +742,10 @@ def ideate_vocabvn(
                 candidate_words.append({"hanzi": hz, "pinyin": py, "meaning": mn})
 
             if has_dummy or len(candidate_words) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Dummy/placeholder words detected in batch #{i+1}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Dummy/placeholder words detected in candidate batch. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng HSK 2-3 không dùng từ mẫu. Tránh các chữ: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng HSK 2-3 không dùng từ mẫu. Không trùng: [{', '.join(matrix.get_existing_topics('vocabVN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabVN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -675,12 +753,12 @@ def ideate_vocabvn(
                         current_batch = ret_list[0]
                 continue
 
-            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words)
+            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words, topic=topic, tab="vocabVN")
             if not is_valid_overlap:
-                print(f"  ⚠ [Gatekeeper 1 QC] Overlap check failed: {reason}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng mới hoàn toàn. Tránh: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng mới hoàn toàn. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('vocabVN')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabVN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -699,7 +777,7 @@ def ideate_vocabvn(
             if not pinyin_passed:
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng chuẩn chỉnh âm điệu. Tránh: {matrix.get_recent_50_tracked()}."
+                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng chuẩn chỉnh âm điệu. Không trùng [{', '.join(matrix.get_existing_topics('vocabVN')[-20:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabVN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -712,7 +790,7 @@ def ideate_vocabvn(
             break
 
         if not valid_batch:
-            print(f"  ❌ [Gatekeeper 1 QC] Batch #{i+1} rejected after {max_retries} attempts to maintain spreadsheet purity.")
+            print(f"  ❌ [Gatekeeper 1 QC] Batch candidate rejected after {max_retries} attempts to maintain spreadsheet purity.")
             continue
 
         cur_id = next_id + appended
@@ -724,9 +802,9 @@ def ideate_vocabvn(
         row_data = [rid, topic, level, "Pending"] + w_cols + [meta_txt, "", "", "", "", now_str, f"Tự động sinh bởi {provider} ({now_str} GMT+7)"]
         sanitized_row = validate_and_sanitize_row(row_data, expected_row_idx=cur_id)
         ws.append_row(sanitized_row)
-        matrix.register_ingested_batch("vocabVN", words)
+        matrix.register_ingested_batch("vocabVN", words, topic=topic)
         appended += 1
-        print(f"  ✓ [{provider}] Appended row {rid}: '{topic}' to tab 'vocabVN'")
+        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid} ({appended}/{count}): '{topic}' to tab 'vocabVN'")
     return appended
 
 
@@ -745,10 +823,11 @@ def ideate_multilevels(
 
     if matrix is None:
         matrix = GlobalHanziFrequencyMatrix(ss)
-    recent_50 = matrix.get_recent_50_tracked()
+    recent_50 = matrix.get_tab_recent_50_tracked("multilevels", limit=50)
+    existing_topics = matrix.get_existing_topics("multilevels")
 
     print(f"\n▶ [Ideation] Processing Tab 'multilevels' (Target: {count} batches)...")
-    print(f"  Current rows: {len(records)-1}, Recent 50 tracked: {len(recent_50)} chars")
+    print(f"  Current rows: {len(records)-1}, Tab Recent tracked: {len(recent_50)} chars, Existing Concepts: {len(existing_topics)}")
 
     sys_prompt = (
         "Bạn là chuyên gia ngôn ngữ tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
@@ -767,22 +846,46 @@ def ideate_multilevels(
         "  }\n"
         "]"
     )
+    topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc, biểu đạt sắc thái từ HSK 1 đến HSK 5. "
+        f"Hãy tạo {count} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc hoàn toàn mới, biểu đạt sắc thái từ HSK 1 đến HSK 5. "
+        f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề/khái niệm sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
 
     ai_data, provider = rotator.generate_quiz_ideas(sys_prompt, user_prompt)
     batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("concepts") or (ai_data or {}).get("topics") or [ai_data])
 
+    batches_pool = [b for b in batches if isinstance(b, dict)] if isinstance(batches, list) else []
     appended = 0
     max_retries = 3
+    attempt_count = 0
+    max_attempts = count * 4
 
-    for i, b in enumerate(batches[:count]):
-        if not isinstance(b, dict):
+    while appended < count and attempt_count < max_attempts:
+        attempt_count += 1
+        if not batches_pool:
+            remaining = count - appended
+            print(f"  ⚡ [Dispatcher] Requesting {remaining} additional candidate batch(es) to fulfill target of {count}...")
+            curr_topics = matrix.get_existing_topics("multilevels")
+            curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
+            ai_data, provider = rotator.generate_quiz_ideas(
+                sys_prompt,
+                f"Hãy tạo {remaining} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc, biểu đạt sắc thái từ HSK 1 đến HSK 5. "
+                f"Tuyệt đối KHÔNG tạo lại các khái niệm: [{curr_ban}]. "
+                f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('multilevels', limit=50)}."
+            )
+            more_batches = ai_data if isinstance(ai_data, list) else ((ai_data or {}).get("batches") or (ai_data or {}).get("concepts") or (ai_data or {}).get("topics") or [ai_data])
+            if isinstance(more_batches, list):
+                batches_pool.extend([b for b in more_batches if isinstance(b, dict)])
+            if not batches_pool:
+                print(f"  ⚠ No more candidate batches returned by AI. Stopping.")
+                break
+
+        current_batch = batches_pool.pop(0)
+        if not isinstance(current_batch, dict):
             continue
 
-        current_batch = b
         valid_batch = False
         levels = []
         clean_concept = ""
@@ -795,9 +898,9 @@ def ideate_multilevels(
             raw_levels = current_batch.get("levels", [])
 
             if len(raw_levels) < 5:
-                print(f"  ⚠ [Gatekeeper 1 QC] Multilevels batch #{i+1} has {len(raw_levels)} levels (< 5 required). Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Multilevels batch has {len(raw_levels)} levels (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
-                    sys_prompt, f"Tạo 1 bộ '1 Nghĩa 5 Cấp Độ HSK' gồm 5 cấp độ HSK 1-5. Tránh: {matrix.get_recent_50_tracked()}."
+                    sys_prompt, f"Tạo 1 bộ '1 Nghĩa 5 Cấp Độ HSK' gồm 5 cấp độ HSK 1-5. Không trùng [{', '.join(matrix.get_existing_topics('multilevels')[-20:])}]. Tránh: {matrix.get_tab_recent_50_tracked('multilevels')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("concepts") or [retry_data])
@@ -811,9 +914,9 @@ def ideate_multilevels(
             }
             is_valid_ml, ml_errors = MultilevelsEscalationValidator.validate_multilevels_batch(batch_to_validate)
             if not is_valid_ml:
-                print(f"  ⚠ [Gatekeeper 1 QC] Multilevels validation failed for batch #{i+1}: {ml_errors}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Multilevels validation failed for candidate batch: {ml_errors}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
-                    sys_prompt, f"Tạo 1 bộ '1 Nghĩa 5 Cấp Độ HSK' chuẩn xác 5 cấp độ HSK 1-5. Tránh: {matrix.get_recent_50_tracked()}."
+                    sys_prompt, f"Tạo 1 bộ '1 Nghĩa 5 Cấp Độ HSK' chuẩn xác 5 cấp độ HSK 1-5. Không trùng [{', '.join(matrix.get_existing_topics('multilevels')[-20:])}]. Tránh: {matrix.get_tab_recent_50_tracked('multilevels')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("concepts") or [retry_data])
@@ -822,11 +925,11 @@ def ideate_multilevels(
                 continue
 
             candidate_words = [{"hanzi": l.get("hanzi", "")} for l in raw_levels]
-            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words)
+            is_valid_overlap, ratio, overlap_list, reason = matrix.evaluate_candidate_batch(candidate_words, topic=topic_title, tab="multilevels")
             if not is_valid_overlap:
-                print(f"  ⚠ [Gatekeeper 1 QC] Multilevels overlap check failed: {reason}. Retrying...")
+                print(f"  ⚠ [Gatekeeper 1 QC] Multilevels anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
-                    sys_prompt, f"Tạo 1 bộ '1 Nghĩa 5 Cấp Độ HSK' hoàn toàn mới. Tránh: {matrix.get_recent_50_tracked()}."
+                    sys_prompt, f"Tạo 1 bộ '1 Nghĩa 5 Cấp Độ HSK' hoàn toàn mới. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('multilevels')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('multilevels')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("concepts") or [retry_data])
@@ -855,7 +958,7 @@ def ideate_multilevels(
             break
 
         if not valid_batch:
-            print(f"  ❌ [Gatekeeper 1 QC] Batch #{i+1} rejected after {max_retries} attempts to maintain spreadsheet purity.")
+            print(f"  ❌ [Gatekeeper 1 QC] Batch candidate rejected after {max_retries} attempts to maintain spreadsheet purity.")
             continue
 
         cur_id = next_id + appended
@@ -866,9 +969,9 @@ def ideate_multilevels(
         row_data = [rid, topic_title, "HSK 1-5", "Pending"] + w_cols + [meta_txt, "", "", "", "", now_str, f"Tự động sinh bởi {provider} ({now_str} GMT+7)"]
         sanitized_row = validate_and_sanitize_row(row_data, expected_row_idx=cur_id)
         ws.append_row(sanitized_row)
-        matrix.register_ingested_batch("multilevels", [{"hanzi": l["hanzi"]} for l in levels])
+        matrix.register_ingested_batch("multilevels", [{"hanzi": l["hanzi"]} for l in levels], topic=topic_title)
         appended += 1
-        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid}: '{topic_title}' to tab 'multilevels'")
+        print(f"  ✓ [{provider}] Passed Gatekeeper 1 QC & Appended row {rid} ({appended}/{count}): '{topic_title}' to tab 'multilevels'")
     return appended
 
 
@@ -941,7 +1044,7 @@ def main():
     print("\n📏 Enforcing strict 21px row height invariant across all tabs...")
     try:
         enforcer = RowHeightEnforcer()
-        enforcer.enforce_all()
+        enforcer.enforce_all(force=True)
         print("✓ 21px Row Height Invariant successfully enforced.")
     except Exception as e:
         print(f"⚠ Warning: Could not run row height enforcer: {e}")
