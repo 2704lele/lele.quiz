@@ -202,18 +202,34 @@ def generate_fresh_batch_for_tab(
     FALLBACK_BANK = {
         "pinyin": [
             ("Thế Giới Côn Trùng", "HSK 3", [("蝴蝶", "hú dié", "con bướm"), ("蚂蚁", "mǎ yǐ", "con kiến"), ("蜜蜂", "mì fēng", "con ong"), ("蜻蜓", "qīng tíng", "con chuồn chuồn"), ("蚊子", "wén zi", "con muỗi")]),
-            ("Đồ Nghề Sửa Chữa", "HSK 3", [("锤子", "chuí zi", "cái búa"), ("螺丝", "luó sī", "ốc vít"), ("尺子", "chǐ zi", "cái thước"), ("胶水", "jiāo shuǐ", "keo dán"), ("剪刀", "jiǎn dāo", "cái kéo")]),
+            ("Đồ Nghề Sửa Chữa", "HSK 3", [("锤子", "chuí zi", "cái búa"), ("螺丝", "luó sī", "ốc vít"), ("胶水", "jiāo shuǐ", "keo dán"), ("剪刀", "jiǎn dāo", "cái kéo"), ("钉子", "dīng zi", "cái đinh")]),
             ("Thời Tiết Khắc Nghiệt", "HSK 3", [("暴雨", "bào yǔ", "mưa bão"), ("台风", "tái fēng", "bão lớn"), ("闪电", "shǎn diàn", "sấm sét"), ("大雾", "dà wù", "sương mù dày"), ("冰雹", "bīng báo", "mưa đá")]),
             ("Nhạc Cụ Âm Nhạc", "HSK 3", [("吉他", "jí tā", "đàn ghi-ta"), ("钢琴", "gāng qín", "đàn piano"), ("笛子", "dí zi", "cây sáo"), ("鼓", "gǔ", "cái trống"), ("小提琴", "xiǎo tí qín", "đàn vĩ cầm")]),
+            ("Đồ Dùng Phòng Tắm", "HSK 2", [("毛巾", "máo jīn", "khăn mặt"), ("牙刷", "yá shuā", "bàn chải đánh răng"), ("牙膏", "yá gāo", "kem đánh răng"), ("香皂", "xiāng zào", "bánh xà phòng"), ("镜子", "jìng zi", "cái gương")]),
+            ("Rau Củ Vườn Nhà", "HSK 2", [("黄瓜", "huáng guā", "dưa chuột"), ("番茄", "fān qié", "cà chua"), ("土豆", "tǔ dòu", "khoai tây"), ("胡萝卜", "hú luó bo", "cà rốt"), ("白菜", "bái cài", "rau cải trắng")]),
+            ("Nghề Nghiệp Xã Hội", "HSK 2", [("警察", "jǐng chá", "cảnh sát"), ("护士", "hù shi", "y tá"), ("司机", "sī jī", "tài xế"), ("厨师", "chú shī", "đầu bếp"), ("记者", "jì zhě", "nhà báo")]),
+            ("Đồ Dùng Phòng Khách", "HSK 2", [("沙发", "shā fā", "ghế sô-pha"), ("电视", "diàn shì", "ti vi"), ("茶几", "chá jī", "bàn trà"), ("窗帘", "chuāng lián", "rèm cửa"), ("空调", "kōng tiáo", "máy điều hòa")]),
+            ("Động Vật Dưới Nước", "HSK 2", [("螃蟹", "páng xiè", "con cua"), ("龙虾", "lóng xiā", "tôm hùm"), ("乌龟", "wū guī", "con rùa"), ("章鱼", "zhāng yú", "bạch tuộc"), ("海豚", "hǎi tún", "cá heo")]),
+            ("Gia Vị Truyền Thống", "HSK 3", [("酱油", "jiàng yóu", "xì dầu"), ("食醋", "shí cù", "giấm ăn"), ("白糖", "bái táng", "đường cát trắng"), ("食盐", "shí yán", "muối ăn"), ("胡椒", "hú jiāo", "hạt tiêu")]),
         ],
         "vocabCN": [
-            ("Địa Điểm Mua Sắm", "HSK 2", [("商场", "shāng chǎng", "trung tâm thương mại"), ("超市", "chāo shì", "siêu thị"), ("书店", "shū diàn", "hiệu sách"), ("花店", "huā diàn", "tiệm hoa"), ("面包店", "miàn bāo diàn", "tiệm bánh mì")]),
-            ("Trang Phục Mặc Ngoài", "HSK 2", [("外套", "wài tào", "áo khoác"), ("衬衫", "chèn shān", "áo sơ mi"), ("裙子", "qún zi", "váy liền"), ("裤子", "kù zi", "quần dài"), ("帽子", "mào zi", "mũ nón")]),
-            ("Động Vật Rừng Xanh", "HSK 2", [("狮子", "shī zi", "sư tử"), ("大象", "dà xiàng", "con voi"), ("猴子", "hóu zi", "con khỉ"), ("老虎", "lǎo hǔ", "con hổ"), ("熊猫", "xióng māo", "gấu trúc")]),
+            ("Địa Điểm Mua Sắm", "HSK 2", [("商场", "shāng chǎng", "trung tâm thương mại"), ("超市", "chāo shì", "siêu thị"), ("书店", "shū diàn", "hiệu sách"), ("花店", "huā diàn", "tiệm hoa"), ("药店", "yào diàn", "hiệu thuốc")]),
+            ("Trang Phục Mùa Đông", "HSK 2", [("大衣", "dà yī", "áo khoác măng tô"), ("毛衣", "máo yī", "áo len"), ("手套", "shǒu tào", "găng tay"), ("围巾", "wéi jīn", "khăn quàng cổ"), ("皮鞋", "pí xié", "giày da")]),
+            ("Động Vật Rừng Xanh", "HSK 2", [("狮子", "shī zi", "sư tử"), ("大象", "dà xiàng", "con voi"), ("猴子", "hóu zi", "con khỉ"), ("长颈鹿", "cháng jǐng lù", "hươu cao cổ"), ("老虎", "lǎo hǔ", "con hổ")]),
+            ("Thiết Bị Công Nghệ", "HSK 3", [("手机", "shǒu jī", "điện thoại di động"), ("电脑", "diàn nǎo", "máy vi tính"), ("平板", "píng bǎn", "máy tính bảng"), ("耳机", "ěr jī", "tai nghe"), ("相机", "xiàng jī", "máy ảnh")]),
+            ("Môi Trường Trường Học", "HSK 2", [("教室", "jiào shì", "phòng học"), ("操场", "cāo chǎng", "sân thể dục"), ("食堂", "shí táng", "nhà ăn"), ("图书馆", "tú shū guǎn", "thư viện"), ("宿舍", "sù shè", "ký túc xá")]),
+            ("Giao Thông Đô Thị", "HSK 2", [("地铁", "dì tiě", "tàu điện ngầm"), ("公交车", "gōng jiāo chē", "xe buýt"), ("轮船", "lún chuán", "tàu thủy"), ("高铁", "gāo tiě", "tàu cao tốc"), ("摩托车", "mó tuō chē", "xe máy")]),
+            ("Dụng Cụ Nhà Bếp", "HSK 2", [("筷子", "kuài zi", "đôi đũa"), ("勺子", "sháo zi", "cái thìa"), ("盘子", "pán zi", "cái đĩa"), ("碗", "wǎn", "cái bát"), ("锅", "guō", "cái nồi")]),
+            ("Nông Trại & Gia Súc", "HSK 2", [("奶牛", "nǎi niú", "bò sữa"), ("绵羊", "mián yáng", "con cừu"), ("鸭子", "yā zi", "con vịt"), ("鹅", "é", "con ngỗng"), ("兔子", "tù zi", "con thỏ")]),
+            ("Đồ Đạc Phòng Ngủ", "HSK 2", [("床单", "chuáng dān", "ga trải giường"), ("被子", "bèi zi", "cái chăn"), ("枕头", "zhěn tou", "cái gối"), ("衣柜", "yī guì", "tủ quần áo"), ("台灯", "tái dēng", "đèn bàn")]),
+            ("Hoạt Động Rảnh Rỗi", "HSK 2", [("散步", "sàn bù", "đi dạo"), ("听歌", "tīng gē", "nghe nhạc"), ("看报", "kàn bào", "đọc báo"), ("养花", "yǎng huā", "trồng hoa"), ("钓鱼", "diào yú", "câu cá")]),
+            ("Cơ Thể Người", "HSK 2", [("头发", "tóu fa", "mái tóc"), ("眼睛", "yǎn jing", "đôi mắt"), ("鼻子", "bí zi", "cái mũi"), ("嘴巴", "zuǐ ba", "cái miệng"), ("耳朵", "ěr duo", "cái tai")]),
+            ("Địa Điểm Du Lịch", "HSK 2", [("海滩", "hǎi tān", "bãi biển"), ("森林", "sēn lín", "khu rừng"), ("瀑布", "pù bù", "thác nước"), ("岛屿", "dǎo yǔ", "hòn đảo"), ("沙漠", "shā mò", "sa mạc")]),
         ],
         "vocabVN": [
-            ("Dụng Cụ Học Tập", "HSK 1", [("sách vở", "shū běn", "书本"), ("bút viết", "bǐ", "笔"), ("thước kẻ", "chǐ zi", "尺子"), ("cặp sách", "shū bāo", "书包"), ("bản đồ", "dì tú", "地图")]),
-            ("Màu Sắc Cơ Bản", "HSK 1", [("màu đỏ", "hóng sè", "红色"), ("màu xanh", "lán sè", "蓝色"), ("màu vàng", "huáng sè", "黄色"), ("màu đen", "hēi sè", "黑色"), ("màu trắng", "bái sè", "白色")]),
+            ("Dụng Cụ Học Tập Mới", "HSK 1", [("sách giáo khoa", "kè běn", "课本"), ("bút chì", "qiān bǐ", "铅笔"), ("thước kẻ", "chǐ zi", "尺子"), ("cặp sách", "shū bāo", "书包"), ("cục tẩy", "xiàng pí", "橡皮")]),
+            ("Môn Thể Thao Mới", "HSK 2", [("bóng chuyền", "pái qiú", "排球"), ("cầu lông", "yǔ máo qiú", "羽毛球"), ("bóng bàn", "pīng pāng qiú", "乒乓球"), ("trượt băng", "huá bīng", "滑冰"), ("leo núi", "pá shān", "爬山")]),
+            ("Đồ Ăn Vặt", "HSK 2", [("bánh quy", "bǐng gān", "饼干"), ("sô-cô-la", "qiǎo kè lì", "巧克力"), ("kẹo ngọt", "táng guǒ", "糖果"), ("khoai tây chiên", "shǔ piàn", "薯片"), ("bỏng ngô", "bào mǐ huā", "爆米花")]),
         ],
         "multilevels": [
             ("Tiết Kiệm", [
@@ -229,6 +245,62 @@ def generate_fresh_batch_for_tab(
                 {"level": 3, "hsk": "HSK 3", "hanzi": "愿意", "pinyin": "yuàn yì", "han_viet": "Nguyện ý", "meaning_vi": "Tự nguyện", "nuance_note": "Nhiệt tình", "visual_action": "Gật đầu đồng ý"},
                 {"level": 4, "hsk": "HSK 4", "hanzi": "奉献", "pinyin": "fèng xiàn", "han_viet": "Phụng hiến", "meaning_vi": "Cống hiến", "nuance_note": "Tận tụy", "visual_action": "Hai tay nâng cao"},
                 {"level": 5, "hsk": "HSK 5", "hanzi": "舍己为人", "pinyin": "shě jǐ wèi rén", "han_viet": "Xả kỷ vị nhân", "meaning_vi": "Quên mình vì người", "nuance_note": "Cao cả", "visual_action": "Đặt tay lên tim"}
+            ]),
+            ("Quyết Tâm", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "想", "pinyin": "xiǎng", "han_viet": "Tưởng", "meaning_vi": "Muốn", "nuance_note": "Cơ bản", "visual_action": "Suy nghĩ"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "要", "pinyin": "yào", "han_viet": "Yếu", "meaning_vi": "Cần phải", "nuance_note": "Mục tiêu", "visual_action": "Chỉ tay về trước"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "决定", "pinyin": "jué dìng", "han_viet": "Quyết định", "meaning_vi": "Hạ quyết tâm", "nuance_note": "Rõ ràng", "visual_action": "Gật đầu dứt khoát"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "决心", "pinyin": "jué xīn", "han_viet": "Quyết tâm", "meaning_vi": "Ý chí kiên định", "nuance_note": "Mạnh mẽ", "visual_action": "Nắm chặt bàn tay"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "破釜沉舟", "pinyin": "pò fǔ chén zhōu", "han_viet": "Phá phủ trầm chu", "meaning_vi": "Quyết tử một phen", "nuance_note": "Tuyệt đối", "visual_action": "Vung tay mạnh mẽ"}
+            ]),
+            ("Đoàn Kết", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "和", "pinyin": "hé", "han_viet": "Hòa", "meaning_vi": "Cùng với", "nuance_note": "Cơ bản", "visual_action": "Đứng cạnh nhau"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "同", "pinyin": "tóng", "han_viet": "Đồng", "meaning_vi": "Chung một", "nuance_note": "Gắn kết", "visual_action": "Bắt tay"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "合作", "pinyin": "hé zuò", "han_viet": "Hợp tác", "meaning_vi": "Hợp tác", "nuance_note": "Chủ động", "visual_action": "Khoác vai"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "团结", "pinyin": "tuán jié", "han_viet": "Đoàn kết", "meaning_vi": "Đồng lòng", "nuance_note": "Vững chắc", "visual_action": "Nắm tay đồng đội"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "万众一心", "pinyin": "wàn zhòng yī xīn", "han_viet": "Vạn chúng nhất tâm", "meaning_vi": "Muôn người như một", "nuance_note": "Tuyệt đối", "visual_action": "Giơ cao tay đồng thanh"}
+            ]),
+            ("Kiên Trì", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "做", "pinyin": "zuò", "han_viet": "Tác", "meaning_vi": "Làm", "nuance_note": "Bắt đầu", "visual_action": "Bắt tay vào làm"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "续", "pinyin": "xù", "han_viet": "Tục", "meaning_vi": "Nối tiếp", "nuance_note": "Không ngừng", "visual_action": "Giơ tay nối"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "坚持", "pinyin": "jiān chí", "han_viet": "Kiên trì", "meaning_vi": "Giữ vững", "nuance_note": "Bền bỉ", "visual_action": "Nắm chặt tay"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "坚韧", "pinyin": "jiān rèn", "han_viet": "Kiên nhẫn", "meaning_vi": "Bền bỉ chịu đựng", "nuance_note": "Dẻo dai", "visual_action": "Đứng vững vàng"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "锲而不舍", "pinyin": "qiè ér bù shě", "han_viet": "Khiết nhi bất xả", "meaning_vi": "Kiên trì không bỏ cuộc", "nuance_note": "Bất khuất", "visual_action": "Bước lên phía trước"}
+            ]),
+            ("Hy Vọng", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "盼", "pinyin": "pàn", "han_viet": "Phán", "meaning_vi": "Mong", "nuance_note": "Ngóng trông", "visual_action": "Nhìn xa xăm"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "望", "pinyin": "wàng", "han_viet": "Vọng", "meaning_vi": "Trông chờ", "nuance_note": "Hy vọng", "visual_action": "Đưa mắt tìm"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "希望", "pinyin": "xī wàng", "han_viet": "Hy vọng", "meaning_vi": "Mong ước", "nuance_note": "Kỳ vọng", "visual_action": "Đặt tay lên ngực"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "渴望", "pinyin": "kě wàng", "han_viet": "Khát khao", "meaning_vi": "Cháy bỏng", "nuance_note": "Chờ đợi", "visual_action": "Vươn hai tay"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "翘首以盼", "pinyin": "qiáo shǒu yǐ pàn", "han_viet": "Kiều thủ dĩ phán", "meaning_vi": "Đăm đăm ngóng đợi", "nuance_note": "Thiết tha", "visual_action": "Kiễng chân ngóng nhìn"}
+            ]),
+            ("Thành Công", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "成", "pinyin": "chéng", "han_viet": "Thành", "meaning_vi": "Xong", "nuance_note": "Hoàn thành", "visual_action": "Gật đầu"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "赢", "pinyin": "yíng", "han_viet": "Doanh", "meaning_vi": "Thắng", "nuance_note": "Đạt được", "visual_action": "Mỉm cười"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "成功", "pinyin": "chéng gōng", "han_viet": "Thành công", "meaning_vi": "Đạt mục tiêu", "nuance_note": "Vang dội", "visual_action": "Giơ tay chữ V"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "胜利", "pinyin": "shèng lì", "han_viet": "Thắng lợi", "meaning_vi": "Vượt qua thử thách", "nuance_note": "Vinh quang", "visual_action": "Nắm tay ăn mừng"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "功成名就", "pinyin": "gōng chéng míng jiù", "han_viet": "Công thành danh toại", "meaning_vi": "Đỉnh cao danh vọng", "nuance_note": "Rực rỡ", "visual_action": "Dang rộng hai tay"}
+            ]),
+            ("Sáng Tạo", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "弄", "pinyin": "nòng", "han_viet": "Lộng", "meaning_vi": "Làm ra", "nuance_note": "Cơ bản", "visual_action": "Đưa tay tạo hình"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "变", "pinyin": "biàn", "han_viet": "Biến", "meaning_vi": "Đổi", "nuance_note": "Đổi mới", "visual_action": "Xoay bàn tay"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "创新", "pinyin": "chuàng xīn", "han_viet": "Đổi mới", "meaning_vi": "Cách tân", "nuance_note": "Tiến bộ", "visual_action": "Mở rộng hai tay"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "创造", "pinyin": "chuàng zào", "han_viet": "Sáng tạo", "meaning_vi": "Kiến tạo", "nuance_note": "Bứt phá", "visual_action": "Đưa tay lên trán"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "独树一帜", "pinyin": "dú shù yī zhì", "han_viet": "Độc thụ nhất xí", "meaning_vi": "Độc nhất vô nhị", "nuance_note": "Phong cách riêng", "visual_action": "Chỉ tay khẳng định"}
+            ]),
+            ("Khen Ngợi", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "夸", "pinyin": "kuā", "han_viet": "Khoa", "meaning_vi": "Khen", "nuance_note": "Lời khen trực tiếp", "visual_action": "Vỗ tay"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "赞", "pinyin": "zàn", "han_viet": "Tán", "meaning_vi": "Khen ngợi", "nuance_note": "Khen ngợi đơn giản", "visual_action": "Giơ ngón cái"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "表扬", "pinyin": "biǎo yáng", "han_viet": "Biểu dương", "meaning_vi": "Tuyên dương", "nuance_note": "Khen ngợi công khai", "visual_action": "Trao giấy khen"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "赞赏", "pinyin": "zàn shǎng", "han_viet": "Tán thưởng", "meaning_vi": "Đánh giá cao", "nuance_note": "Thưởng thức sâu sắc", "visual_action": "Gật đầu tán thưởng"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "赞不绝口", "pinyin": "zàn bù jué kǒu", "han_viet": "Tán bất tuyệt khẩu", "meaning_vi": "Khen không dứt lời", "nuance_note": "Ca ngợi hết lời", "visual_action": "Hai tay giơ ngón cái liên tục"}
+            ]),
+            ("Kính Trọng", [
+                {"level": 1, "hsk": "HSK 1", "hanzi": "敬", "pinyin": "jìng", "han_viet": "Kính", "meaning_vi": "Kính cẩn", "nuance_note": "Tôn kính cơ bản", "visual_action": "Cúi đầu nhẹ"},
+                {"level": 2, "hsk": "HSK 2", "hanzi": "尊", "pinyin": "zūn", "han_viet": "Tôn", "meaning_vi": "Tôn trọng", "nuance_note": "Đặt ở vị trí cao", "visual_action": "Đứng nghiêm"},
+                {"level": 3, "hsk": "HSK 3", "hanzi": "尊重", "pinyin": "zūn zhòng", "han_viet": "Tôn trọng", "meaning_vi": "Coi trọng phẩm giá", "nuance_note": "Lắng nghe chăm chú", "visual_action": "Chắp tay nhẹ"},
+                {"level": 4, "hsk": "HSK 4", "hanzi": "崇敬", "pinyin": "chóng jìng", "han_viet": "Sùng kính", "meaning_vi": "Tôn sùng ngưỡng mộ", "nuance_note": "Đặt tay lên tim", "visual_action": "Cúi mình kính cẩn"},
+                {"level": 5, "hsk": "HSK 5", "hanzi": "肃然起敬", "pinyin": "sù rán qǐ jìng", "han_viet": "Túc nhiên khởi kính", "meaning_vi": "Bỗng sinh lòng tôn kính", "nuance_note": "Cảm phục sâu sắc", "visual_action": "Đứng thẳng chắp tay"}
             ])
         ]
     }
@@ -412,8 +484,10 @@ def audit_and_repair_tab(
         return {"tab": tab, "scanned_rows": 0, "duplicates_found": [], "invalid_spirit_found": [], "repaired_rows": []}
 
     seen_topics: Dict[str, int] = {}
+    seen_row_words: List[Dict[str, Any]] = []
     duplicates_found: List[Dict[str, Any]] = []
     invalid_spirit_found: List[Dict[str, Any]] = []
+    word_overlap_violations: List[Dict[str, Any]] = []
     rows_to_repair: List[int] = []
 
     for idx, r in enumerate(rows[1:], start=2):
@@ -455,16 +529,47 @@ def audit_and_repair_tab(
                     "errors": spirit_errs,
                 })
 
+        # 3. Pairwise Word Overlap Check (Max allowed duplicate words between any two rows is <= 2)
+        is_word_overlap_violation = False
+        words_list, _ = matrix._extract_hanzi_and_words_from_row(tab, r)
+        current_words = set(words_list)
+        if current_words:
+            for past_row in seen_row_words:
+                shared_w = current_words.intersection(past_row["words"])
+                if len(shared_w) >= 3:
+                    is_word_overlap_violation = True
+                    word_overlap_violations.append({
+                        "row_idx": idx,
+                        "row_id": row_id,
+                        "topic": raw_topic,
+                        "status": status,
+                        "matches_row": past_row["row_idx"],
+                        "matches_id": past_row["row_id"],
+                        "matches_topic": past_row["topic"],
+                        "overlapping_words": sorted(list(shared_w))
+                    })
+                    break
+            seen_row_words.append({
+                "row_idx": idx,
+                "row_id": row_id,
+                "topic": raw_topic,
+                "status": status,
+                "words": current_words
+            })
+
         # Check if row should be repaired
         if target_row_indices is not None:
             if idx in target_row_indices:
                 rows_to_repair.append(idx)
         else:
-            # If it's a duplicate and status is Pending/Ready, or if it has invalid theory topic
+            # If it's a duplicate and status is Pending/Ready/Video
             if is_dup and status in ["Pending", "Ready", "Video"]:
                 rows_to_repair.append(idx)
             elif is_invalid_spirit and status in ["Pending", "Ready"]:
                 # If earlier published video, don't break existing video unless forced
+                rows_to_repair.append(idx)
+            elif is_word_overlap_violation and status in ["Pending", "Ready", "Video"]:
+                # If non-published video shares >= 3 words with any earlier row, repair in-place!
                 rows_to_repair.append(idx)
 
     repaired_rows: List[Dict[str, Any]] = []
@@ -472,6 +577,7 @@ def audit_and_repair_tab(
     print(f"\n📊 [Tab: {tab}] Scanned {len(rows)-1} rows.")
     print(f"  • Duplicates found: {len(duplicates_found)}")
     print(f"  • Invalid spirit found: {len(invalid_spirit_found)}")
+    print(f"  • Word overlap >= 3 violations: {len(word_overlap_violations)}")
     print(f"  • Rows queued for in-place repair: {len(rows_to_repair)}")
 
     if not dry_run and rows_to_repair:
@@ -502,6 +608,7 @@ def audit_and_repair_tab(
         "scanned_rows": len(rows) - 1,
         "duplicates_found": duplicates_found,
         "invalid_spirit_found": invalid_spirit_found,
+        "word_overlap_violations": word_overlap_violations,
         "repaired_rows": repaired_rows,
         "dry_run": dry_run
     }
@@ -568,6 +675,7 @@ def main():
         tab_name = r["tab"]
         dups = r["duplicates_found"]
         spirits = r["invalid_spirit_found"]
+        overlaps = r.get("word_overlap_violations", [])
         repaired = r["repaired_rows"]
         report_lines.append(f"<b>📌 Tab: {tab_name}</b> ({r['scanned_rows']} hàng)")
         if dups:
@@ -576,10 +684,13 @@ def main():
         if spirits:
             spirit_ids = ", ".join(f"#{s['row_idx']}" for s in spirits)
             report_lines.append(f"  • Sai tinh thần quiz/lý thuyết: {len(spirits)} hàng ({spirit_ids})")
+        if overlaps:
+            overlap_ids = ", ".join(f"#{o['row_idx']}" for o in overlaps)
+            report_lines.append(f"  • Trùng từ vựng (≥3 từ): {len(overlaps)} hàng ({overlap_ids})")
         if repaired:
             rep_strs = [f"#{x['row_idx']} ➔ '{x['new_topic']}'" for x in repaired]
             report_lines.append(f"  • <b>Đã tái tạo in-place ({len(repaired)}):</b>\n    " + "\n    ".join(rep_strs))
-        if not dups and not spirits:
+        if not dups and not spirits and not overlaps:
             report_lines.append(f"  • <i>Hoàn toàn sạch, không trùng lặp!</i>")
         report_lines.append("")
 

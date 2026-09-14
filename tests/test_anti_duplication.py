@@ -117,23 +117,40 @@ def test_matrix_evaluate_rejects_duplicate_topic():
     assert "Duplicate Topic" in reason
 
 
-def test_matrix_evaluate_rejects_duplicate_hanzi_words():
-    """Verify evaluate_candidate_batch rejects exact Hanzi words already existing in tab."""
+def test_matrix_evaluate_rejects_pairwise_word_overlap_ge_3():
+    """Verify evaluate_candidate_batch rejects candidate batch if it overlaps >= 3 words with any past row."""
     matrix = GlobalHanziFrequencyMatrix(spreadsheet_client=None)
-    matrix.tab_words["pinyin"].add("米饭")
-    matrix.tab_words["pinyin"].add("牛奶")
+    # Simulate an existing row in pinyin tab with 5 words
+    matrix.tab_row_words["pinyin"].append({"苹果", "香蕉", "西瓜", "葡萄", "草莓"})
 
-    candidate_words = [
-        {"hanzi": "米饭", "pinyin": "mǐ fàn", "meaning": "cơm"},
-        {"hanzi": "西瓜", "pinyin": "xī guā", "meaning": "dưa hấu"}
+    # Candidate with 3 overlapping words (苹果, 香蕉, 西瓜) -> MUST BE REJECTED
+    candidate_bad = [
+        {"hanzi": "苹果", "pinyin": "píng guǒ", "meaning": "quả táo"},
+        {"hanzi": "香蕉", "pinyin": "xiāng jiāo", "meaning": "quả chuối"},
+        {"hanzi": "西瓜", "pinyin": "xī guā", "meaning": "dưa hấu"},
+        {"hanzi": "橘子", "pinyin": "jú zi", "meaning": "quả quýt"},
+        {"hanzi": "桃子", "pinyin": "táo zi", "meaning": "quả đào"},
     ]
-
     is_valid, ratio, errs, reason = matrix.evaluate_candidate_batch(
-        candidate_words, topic="Chủ đề trái cây nhiệt đới mới", tab="pinyin"
+        candidate_bad, topic="Chủ đề trái cây nhiệt đới mới", tab="pinyin"
     )
     assert is_valid is False
-    assert "Duplicate Word" in reason
-    assert "米饭" in errs
+    assert "Word Overlap >= 3" in reason
+    assert len(errs) == 3
+
+    # Candidate with only 2 overlapping words (苹果, 香蕉) -> MUST BE ALLOWED (as long as char ratio permits)
+    matrix.tab_recent_hanzi["pinyin"] = []  # Clear char overlap constraint for isolation
+    candidate_ok = [
+        {"hanzi": "苹果", "pinyin": "píng guǒ", "meaning": "quả táo"},
+        {"hanzi": "香蕉", "pinyin": "xiāng jiāo", "meaning": "quả chuối"},
+        {"hanzi": "梨", "pinyin": "lí", "meaning": "quả lê"},
+        {"hanzi": "芒果", "pinyin": "máng guǒ", "meaning": "quả xoài"},
+        {"hanzi": "樱桃", "pinyin": "yīng táo", "meaning": "quả anh đào"},
+    ]
+    is_valid_ok, _, _, _ = matrix.evaluate_candidate_batch(
+        candidate_ok, topic="Chủ đề vườn cây ăn trái", tab="pinyin"
+    )
+    assert is_valid_ok is True
 
 
 def test_matrix_tab_isolated_character_overlap():

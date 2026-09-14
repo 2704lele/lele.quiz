@@ -128,3 +128,40 @@ def test_in_place_repair_preserves_row_id_and_structure():
     assert row_cells[0] == "#3"  # Preserved Row ID!
     assert row_cells[1] == "Đồ Dùng Học Tập"
     assert row_cells[3] == "Pending"  # Status reset to Pending
+
+
+def test_audit_detects_word_overlap_ge_3():
+    """Verify that audit_and_repair_tab detects pairwise word overlap >= 3 and queues repair."""
+    mock_ws = MagicMock()
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+
+    # Row 2: Has words A, B, C, D, E
+    # Row 3: Has words A, B, C, X, Y (overlap = 3: A, B, C) -> VIOLATION!
+    # Row 4: Has words A, B, F, G, H (overlap = 2 with Row 2: A, B; overlap = 2 with Row 3: A, B) -> ALLOWED (<= 2)
+    sample_rows = [
+        STANDARD_COLUMNS,
+        ["#2", "Chủ Đề 1", "HSK 1", "Published", "苹果 | píng guǒ | táo", "香蕉 | xiāng jiāo | chuối", "西瓜 | xī guā | dưa hấu", "葡萄 | pú tao | nho", "草莓 | cǎo méi | dâu", "YOUTUBE SHORTS", "", "", "", "", "2026-09-01", ""],
+        ["#3", "Chủ Đề 2", "HSK 1", "Ready", "苹果 | píng guǒ | táo", "香蕉 | xiāng jiāo | chuối", "西瓜 | xī guā | dưa hấu", "橘子 | jú zi | quýt", "桃子 | táo zi | đào", "YOUTUBE SHORTS", "", "", "", "", "2026-09-02", ""],
+        ["#4", "Chủ Đề 3", "HSK 1", "Pending", "苹果 | píng guǒ | táo", "香蕉 | xiāng jiāo | chuối", "梨 | lí | lê", "芒果 | máng guǒ | xoài", "樱桃 | yīng táo | anh đào", "YOUTUBE SHORTS", "", "", "", "", "2026-09-03", ""],
+    ]
+    mock_ws.get_all_values.return_value = sample_rows
+
+    matrix = GlobalHanziFrequencyMatrix(spreadsheet_client=None)
+    rotator = MagicMock()
+
+    res = audit_and_repair_tab(
+        ss=mock_ss,
+        tab="pinyin",
+        rotator=rotator,
+        matrix=matrix,
+        dry_run=True,
+        fix_spirit=False
+    )
+
+    assert res["scanned_rows"] == 3
+    assert len(res["duplicates_found"]) == 0
+    assert len(res["word_overlap_violations"]) == 1
+    assert res["word_overlap_violations"][0]["row_idx"] == 3
+    assert len(res["word_overlap_violations"][0]["overlapping_words"]) == 3
+    assert set(res["word_overlap_violations"][0]["overlapping_words"]) == {"苹果", "香蕉", "西瓜"}

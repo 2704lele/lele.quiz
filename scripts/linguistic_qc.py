@@ -237,6 +237,7 @@ class GlobalHanziFrequencyMatrix:
         self.tab_topics: Dict[str, Set[str]] = {t: set() for t in QUIZ_TABS}
         self.tab_raw_topics: Dict[str, List[str]] = {t: [] for t in QUIZ_TABS}
         self.tab_words: Dict[str, Set[str]] = {t: set() for t in QUIZ_TABS}
+        self.tab_row_words: Dict[str, List[Dict[str, Any]]] = {t: [] for t in QUIZ_TABS}
         self.tab_recent_hanzi: Dict[str, List[str]] = {t: [] for t in QUIZ_TABS}
         self.recent_50_tracked: List[str] = []
         if self.client is not None:
@@ -293,7 +294,7 @@ class GlobalHanziFrequencyMatrix:
                 rows = []
 
             tab_char_list: List[str] = []
-            for r in rows[1:]:
+            for idx, r in enumerate(rows[1:], start=2):
                 # Extract Topic (Column B / index 1)
                 topic_val = r[1].strip() if len(r) > 1 else ""
                 if topic_val:
@@ -306,6 +307,16 @@ class GlobalHanziFrequencyMatrix:
                 words, chars = self._extract_hanzi_and_words_from_row(tab, r)
                 for w in words:
                     self.tab_words[tab].add(w)
+                rid = r[0].strip() if len(r) > 0 else f"#{idx}"
+                status = r[3].strip() if len(r) > 3 else ""
+                if words:
+                    self.tab_row_words[tab].append({
+                        "row_idx": idx,
+                        "row_id": rid,
+                        "topic": topic_val,
+                        "status": status,
+                        "words": set(words)
+                    })
                 for c in chars:
                     self.matrix[c] = self.matrix.get(c, 0) + 1
                     self.tab_matrix[tab][c] = self.tab_matrix[tab].get(c, 0) + 1
@@ -380,17 +391,28 @@ class GlobalHanziFrequencyMatrix:
             self.tab_raw_topics[tab].append(clean_t)
 
         new_chars: List[str] = []
+        new_words_set: Set[str] = set()
         for w in batch_words:
             hz = w.get("hanzi", "").strip() if isinstance(w, dict) else str(w).strip()
             if hz:
                 if tab in self.tab_words:
                     self.tab_words[tab].add(hz)
+                new_words_set.add(hz)
                 for c in hz:
                     if "\u4e00" <= c <= "\u9fff":
                         self.matrix[c] = self.matrix.get(c, 0) + 1
                         if tab in self.tab_matrix:
                             self.tab_matrix[tab][c] = self.tab_matrix[tab].get(c, 0) + 1
                         new_chars.append(c)
+
+        if new_words_set and tab in self.tab_row_words:
+            self.tab_row_words[tab].append({
+                "row_idx": len(self.tab_row_words[tab]) + 2,
+                "row_id": f"#{len(self.tab_row_words[tab]) + 1}",
+                "topic": clean_t or topic,
+                "status": "Pending",
+                "words": new_words_set
+            })
 
         # Update tab-specific recent Hanzi
         if tab in self.tab_recent_hanzi:
@@ -455,14 +477,22 @@ class GlobalHanziFrequencyMatrix:
                     if "\u4e00" <= c <= "\u9fff":
                         batch_chars.add(c)
 
-        if not batch_chars:
-            return False, 1.0, [], "Candidate batch contains no Hanzi characters."
-
-        # 2. Exact Word Duplicate QC within Tab
-        if tab and tab in self.tab_words:
-            duplicate_words = [w for w in batch_words_set if w in self.tab_words[tab]]
-            if duplicate_words:
-                return False, 1.0, duplicate_words, f"Rejected (Duplicate Word): Từ vựng {duplicate_words} đã xuất hiện trong lịch sử tab '{tab}'."
+        # 2. Pairwise Max Word Overlap QC (Max allowed duplicate words across ANY two rows is <= 2)
+        # Invariant: Any candidate batch sharing >= 3 words with ANY past row in the tab is strictly forbidden.
+        if tab and tab in self.tab_row_words:
+            for past_row in self.tab_row_words[tab]:
+                past_w = past_row["words"] if isinstance(past_row, dict) else past_row
+                overlap_w = batch_words_set.intersection(past_w)
+                if len(overlap_w) >= 3:
+                    overlap_ratio = len(overlap_w) / max(1, len(batch_words_set))
+                    row_id_label = past_row.get("row_id", "cũ") if isinstance(past_row, dict) else "cũ"
+                    topic_label = past_row.get("topic", "") if isinstance(past_row, dict) else ""
+                    return (
+                        False,
+                        overlap_ratio,
+                        sorted(list(overlap_w)),
+                        f"Rejected (Word Overlap >= 3): Trùng {len(overlap_w)} từ vựng {sorted(list(overlap_w))} với hàng {row_id_label} ('{topic_label}'). Quy tắc: Tối đa chỉ được trùng ≤ 2 từ giữa 2 hàng bất kỳ."
+                    )
 
         # 3. Tab-Isolated Hanzi Character Overlap QC
         if tab and tab in self.tab_recent_hanzi:
