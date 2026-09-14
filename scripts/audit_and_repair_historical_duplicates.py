@@ -60,18 +60,19 @@ from scripts.run_ideation_dispatcher import (
 
 def send_telegram_alert(message: str) -> None:
     """Sends audit & repair report to Telegram."""
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "-1004392602002")
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "-1004392602002").strip()
     if not token:
         env_file = os.path.expanduser("~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env")
         if os.path.exists(env_file):
             try:
                 with open(env_file, "r", encoding="utf-8") as f:
                     for line in f:
+                        line = line.strip()
                         if line.startswith("TELEGRAM_BOT_TOKEN="):
-                            token = line.split("=", 1)[1].strip()
+                            token = line.split("=", 1)[1].strip().strip('"').strip("'")
                         elif line.startswith("TELEGRAM_CHAT_ID="):
-                            chat_id = line.split("=", 1)[1].strip()
+                            chat_id = line.split("=", 1)[1].strip().strip('"').strip("'")
             except Exception:
                 pass
 
