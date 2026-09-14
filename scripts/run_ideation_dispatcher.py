@@ -42,6 +42,8 @@ from scripts.linguistic_qc import (
     MultilevelsEscalationValidator,
     is_dummy_word,
     normalize_pinyin_spacing,
+    clean_quiz_topic,
+    validate_topic_spirit,
 )
 
 SPREADSHEET_ID = "1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0"
@@ -186,25 +188,25 @@ def build_pinyin_metadata(batch_id: str, topic: str, level: str, words: List[Dic
 
 【 1. YOUTUBE SHORTS 】
 Tiêu đề (Title):
-Thử Thách Phát Âm Pinyin: {topic} ({level}) 🎯 | Lê Lê Học Tiếng Trung #Shorts
+Trắc Nghiệm Pinyin: {topic} ({level}) 🎯 | Lê Lê Học Tiếng Trung #Shorts
 
 Mô tả (Description):
-🎯 Thử tài phát âm và nhận diện Pinyin chuẩn xác cùng Lê Lê!
+🎯 Thử tài phản xạ và nhận diện Pinyin chuẩn xác cùng Lê Lê!
 Chủ đề hôm nay: {topic} ({level})
 
 📚 TỪ VỰNG TRONG VIDEO:
 {word_lines}
 
-💬 Bạn phát âm đúng bao nhiêu từ? Hãy để lại bình luận nhé! 👇
+💬 Bạn nhớ đúng bao nhiêu từ? Hãy để lại bình luận nhé! 👇
 🔔 Đăng ký kênh @lelehoctiengtrung để học tiếng Trung mỗi ngày!
 
 【 2. TIKTOK 】
 Caption & Hashtags:
-Thử thách phát âm Pinyin chuẩn cùng Lê Lê! Chủ đề: {topic} ({level}) 🎯 Bạn đúng bao nhiêu từ? 👇 #lelehoctiengtrung #tiengtrung #pinyin #hsk #hoctiengtrung
+Trắc nghiệm Pinyin cùng Lê Lê! Chủ đề: {topic} ({level}) 🎯 Bạn đúng bao nhiêu từ? 👇 #lelehoctiengtrung #tiengtrung #pinyin #hsk #hoctiengtrung
 
 【 3. FACEBOOK REELS 】
 Caption & Hashtags:
-Luyện phản xạ Pinyin tiếng Trung mỗi ngày: {topic} ({level})! ✨ Cùng kiểm tra xem bạn phát âm đúng bao nhiêu từ nha! #lelehoctiengtrung #tiengtrung #hsk"""
+Luyện phản xạ Pinyin tiếng Trung mỗi ngày: {topic} ({level})! ✨ Cùng kiểm tra xem bạn nhớ đúng bao nhiêu từ nha! #lelehoctiengtrung #tiengtrung #hsk"""
     return txt.strip().lstrip("=")
 
 
@@ -322,16 +324,23 @@ def ideate_pinyin(
 
     sys_prompt = (
         "Bạn là chuyên gia ngôn ngữ tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
-        "Nhiệm vụ: Tạo các bộ câu hỏi trắc nghiệm phát âm Pinyin (Pinyin Quiz). "
+        "Nhiệm vụ: Tạo các bộ câu hỏi trắc nghiệm Pinyin (Pinyin Quiz). "
         "Mỗi câu hỏi có 1 chữ Hán, 1 phiên âm Pinyin chuẩn và nghĩa tiếng Việt ngắn gọn. "
+        "QUY TẮC CHỦ ĐỀ (TOPIC): Bắt buộc là danh mục từ vựng đời sống thực tế ngắn gọn 2-4 từ tiếng Việt "
+        "(ví dụ: 'Đồ Gia Dụng', 'Rau Củ Quả', 'Nghề Nghiệp', 'Trang Phục', 'Phương Tiện', 'Đồ Ăn', 'Dụng Cụ Học Tập', 'Thời Tiết'). "
+        "TUYỆT ĐỐI CẤM: KHÔNG tạo các chủ đề mang tính lý thuyết ngữ âm, luyện phát âm, phân biệt thanh điệu, thanh nhẹ, âm bật hơi, vận mẫu. "
+        "Đây là QUIZ TỪ VỰNG NHANH, không phải bài giảng phát âm. "
+        "KHÔNG kèm ' (HSK 1)' hay tiền tố 'Chủ đề:' vào trường topic (Level đã có cột riêng). "
         "Quy tắc Pinyin: Bắt buộc có dấu cách giữa các âm tiết tương ứng từng chữ Hán (ví dụ: 'mǐ fàn', 'píng guǒ', 'fēi jī'). "
-        "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề tiếng Việt\", \"level\": \"HSK 2\", "
+        "Output JSON dạng mảng: [{\"topic\": \"Đồ Gia Dụng\", \"level\": \"HSK 2\", "
         "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píng guǒ\", \"meaning\": \"quả táo\"}]}]"
     )
     topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Pinyin hoàn toàn mới lạ, mỗi chủ đề gồm 5 từ vựng HSK 1-3 thông dụng. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Pinyin hoàn toàn mới lạ. "
+        f"YÊU CẦU: Mỗi chủ đề là một danh mục từ vựng đời sống thực tế ngắn gọn (2-4 từ tiếng Việt), gồm 5 từ vựng HSK 1-3 thông dụng. "
         f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+        f"TUYỆT ĐỐI CẤM: Không tạo chủ đề lý thuyết ngữ âm, không luyện thanh điệu, không thanh nhẹ, không âm bật hơi. "
         f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề đã có sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
@@ -354,8 +363,9 @@ def ideate_pinyin(
             curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
             ai_data, provider = rotator.generate_quiz_ideas(
                 sys_prompt,
-                f"Hãy tạo {remaining} chủ đề trắc nghiệm Pinyin hoàn toàn mới, mỗi chủ đề gồm 5 từ vựng HSK 1-3 thông dụng. "
+                f"Hãy tạo {remaining} chủ đề trắc nghiệm Pinyin hoàn toàn mới lạ (danh mục từ vựng đời sống 2-4 từ, ví dụ 'Gia Vị Nấu Ăn', 'Rau Củ Quả'). "
                 f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+                f"TUYỆT ĐỐI CẤM: Không tạo lý thuyết ngữ âm/thanh điệu/âm bật hơi. "
                 f"Tuyệt đối KHÔNG tạo lại các chủ đề: [{curr_ban}]. "
                 f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('pinyin', limit=50)}."
             )
@@ -376,7 +386,8 @@ def ideate_pinyin(
         level = ""
 
         for attempt in range(max_retries):
-            topic = current_batch.get("topic", f"Chủ Đề Pinyin #{next_id + appended}").strip()
+            raw_topic = current_batch.get("topic", f"Chủ Đề Pinyin #{next_id + appended}").strip()
+            topic = clean_quiz_topic(raw_topic, tab="pinyin")
             level = current_batch.get("level", "HSK 2")
             raw_words = current_batch.get("words", [])
 
@@ -384,7 +395,7 @@ def ideate_pinyin(
                 print(f"  ⚠ [Gatekeeper 1 QC] Batch has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin chuẩn xác gồm đúng 5 từ vựng HSK 1-3 (Pinyin có dấu cách như 'mǐ fàn'). Không trùng chủ đề [{', '.join(matrix.get_existing_topics('pinyin')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
+                    f"Tạo 1 chủ đề Pinyin (chủ đề từ vựng đời sống thực tế 2-4 từ, ví dụ 'Dụng Cụ Nhà Bếp') gồm đúng 5 từ vựng HSK 1-3. Không trùng [{', '.join(matrix.get_existing_topics('pinyin')[-20:])}]. Tránh: {matrix.get_tab_recent_50_tracked('pinyin')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -420,7 +431,7 @@ def ideate_pinyin(
                 print(f"  ⚠ [Gatekeeper 1 QC] Anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề Pinyin gồm 5 từ vựng HSK 1-3 hoàn toàn mới. Tuyệt đối không dùng chủ đề [{', '.join(matrix.get_existing_topics('pinyin')[-25:])}]. Tuyệt đối không dùng chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
+                    f"Tạo 1 chủ đề từ vựng đời sống thực tế 2-4 từ (ví dụ 'Trang Phục Mùa Đông') gồm 5 từ vựng HSK 1-3 mới. Cấm lý thuyết ngữ âm. Tuyệt đối không dùng chủ đề [{', '.join(matrix.get_existing_topics('pinyin')[-25:])}]. Tránh chữ: {matrix.get_tab_recent_50_tracked('pinyin')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -493,14 +504,20 @@ def ideate_vocabcn(
     sys_prompt = (
         "Bạn là biên tập viên tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
         "Nhiệm vụ: Tạo các bộ trắc nghiệm Đoán Nghĩa Tiếng Việt từ chữ Hán (VocabCN Quiz). "
+        "QUY TẮC CHỦ ĐỀ (TOPIC): Bắt buộc là danh mục từ vựng đời sống thực tế ngắn gọn 2-4 từ tiếng Việt "
+        "(ví dụ: 'Đồ Dùng Nhà Bếp', 'Thời Tiết', 'Địa Điểm Công Cộng', 'Cảm Xúc', 'Động Vật', 'Màu Sắc', 'Cây Cối'). "
+        "TUYỆT ĐỐI CẤM: Không tạo chủ đề dài dòng, không tạo lý thuyết ngữ pháp/ngữ âm. Tên chủ đề chỉ 2-4 từ. "
+        "KHÔNG kèm ' (HSK 1)' hay tiền tố 'Chủ đề:' vào trường topic. "
         "Quy tắc Pinyin: Bắt buộc có dấu cách giữa các âm tiết tương ứng từng chữ Hán (ví dụ: 'píng guǒ', 'fēi jī'). "
-        "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề tiếng Việt\", \"level\": \"HSK 2\", "
+        "Output JSON dạng mảng: [{\"topic\": \"Đồ Dùng Nhà Bếp\", \"level\": \"HSK 2\", "
         "\"words\": [{\"hanzi\": \"苹果\", \"pinyin\": \"píng guǒ\", \"meaning\": \"quả táo\"}]}]"
     )
     topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt hoàn toàn mới lạ, mỗi chủ đề gồm 5 từ vựng HSK 2-3 hay gặp. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt hoàn toàn mới lạ. "
+        f"YÊU CẦU: Mỗi chủ đề là danh mục từ vựng đời sống thực tế ngắn gọn (2-4 từ tiếng Việt), gồm 5 từ vựng HSK 2-3 hay gặp. "
         f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+        f"TUYỆT ĐỐI CẤM: Không tạo chủ đề lý thuyết ngữ âm/ngữ pháp. Tên chủ đề ngắn gọn 2-4 từ. "
         f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề đã có sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
@@ -523,8 +540,9 @@ def ideate_vocabcn(
             curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
             ai_data, provider = rotator.generate_quiz_ideas(
                 sys_prompt,
-                f"Hãy tạo {remaining} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt hoàn toàn mới, mỗi chủ đề gồm 5 từ vựng HSK 2-3 hay gặp. "
+                f"Hãy tạo {remaining} chủ đề trắc nghiệm Đoán Nghĩa Tiếng Việt hoàn toàn mới (danh mục từ vựng đời sống ngắn gọn 2-4 từ). "
                 f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'píng guǒ', 'mǐ fàn'). "
+                f"TUYỆT ĐỐI CẤM: Không tạo lý thuyết ngữ pháp/ngữ âm. "
                 f"Tuyệt đối KHÔNG tạo lại các chủ đề: [{curr_ban}]. "
                 f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('vocabCN', limit=50)}."
             )
@@ -545,7 +563,8 @@ def ideate_vocabcn(
         level = ""
 
         for attempt in range(max_retries):
-            topic = current_batch.get("topic", f"Đoán Nghĩa Tiếng Việt #{next_id + appended}").strip()
+            raw_topic = current_batch.get("topic", f"Đoán Nghĩa Tiếng Việt #{next_id + appended}").strip()
+            topic = clean_quiz_topic(raw_topic, tab="vocabCN")
             level = current_batch.get("level", "HSK 2")
             raw_words = current_batch.get("words", [])
 
@@ -553,7 +572,7 @@ def ideate_vocabcn(
                 print(f"  ⚠ [Gatekeeper 1 QC] Batch has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'píng guǒ'). Không trùng [{', '.join(matrix.get_existing_topics('vocabCN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabCN')}."
+                    f"Tạo 1 chủ đề VocabCN (danh mục từ vựng đời sống 2-4 từ) gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'píng guǒ'). Không trùng [{', '.join(matrix.get_existing_topics('vocabCN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabCN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -589,7 +608,7 @@ def ideate_vocabcn(
                 print(f"  ⚠ [Gatekeeper 1 QC] Anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabCN gồm 5 từ vựng mới hoàn toàn. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('vocabCN')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabCN')}."
+                    f"Tạo 1 chủ đề VocabCN ngắn gọn 2-4 từ gồm 5 từ vựng mới hoàn toàn. Cấm lý thuyết. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('vocabCN')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabCN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -662,14 +681,20 @@ def ideate_vocabvn(
     sys_prompt = (
         "Bạn là biên tập viên tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
         "Nhiệm vụ: Tạo các bộ trắc nghiệm Đoán Chữ Hán từ Nghĩa Tiếng Việt (VocabVN Quiz). "
+        "QUY TẮC CHỦ ĐỀ (TOPIC): Bắt buộc là danh mục từ vựng đời sống thực tế ngắn gọn 2-4 từ tiếng Việt "
+        "(ví dụ: 'Bộ Phận Cơ Thể', 'Gia Vị Nấu Ăn', 'Trái Cây', 'Thiết Bị Điện Tử', 'Tính Cách', 'Văn Phòng Phẩm'). "
+        "TUYỆT ĐỐI CẤM: Không tạo chủ đề dài dòng, không tạo lý thuyết ngữ pháp/ngữ âm. Tên chủ đề chỉ 2-4 từ. "
+        "KHÔNG kèm ' (HSK 1)' hay tiền tố 'Chủ đề:' vào trường topic. "
         "Quy tắc Pinyin: Bắt buộc có dấu cách giữa các âm tiết tương ứng từng chữ Hán (ví dụ: 'fēi jī', 'píng guǒ'). "
-        "Output JSON dạng mảng: [{\"topic\": \"Tên chủ đề\", \"level\": \"HSK 2\", "
+        "Output JSON dạng mảng: [{\"topic\": \"Bộ Phận Cơ Thể\", \"level\": \"HSK 2\", "
         "\"words\": [{\"hanzi\": \"飞机\", \"pinyin\": \"fēi jī\", \"meaning\": \"máy bay\"}]}]"
     )
     topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Chữ Hán hoàn toàn mới lạ, mỗi chủ đề gồm 5 từ vựng HSK 2-3 thông dụng. "
+        f"Hãy tạo {count} chủ đề trắc nghiệm Đoán Chữ Hán hoàn toàn mới lạ. "
+        f"YÊU CẦU: Mỗi chủ đề là danh mục từ vựng đời sống thực tế ngắn gọn (2-4 từ tiếng Việt), gồm 5 từ vựng HSK 2-3 thông dụng. "
         f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'fēi jī', 'mǐ fàn'). "
+        f"TUYỆT ĐỐI CẤM: Không tạo chủ đề lý thuyết ngữ âm/ngữ pháp. Tên chủ đề ngắn gọn 2-4 từ. "
         f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề đã có sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
@@ -692,8 +717,9 @@ def ideate_vocabvn(
             curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
             ai_data, provider = rotator.generate_quiz_ideas(
                 sys_prompt,
-                f"Hãy tạo {remaining} chủ đề trắc nghiệm Đoán Chữ Hán hoàn toàn mới, mỗi chủ đề gồm 5 từ vựng HSK 2-3 thông dụng. "
+                f"Hãy tạo {remaining} chủ đề trắc nghiệm Đoán Chữ Hán hoàn toàn mới (danh mục từ vựng đời sống thực tế 2-4 từ). "
                 f"Pinyin phải có dấu cách giữa các âm tiết (ví dụ: 'fēi jī', 'mǐ fàn'). "
+                f"TUYỆT ĐỐI CẤM: Không tạo lý thuyết ngữ âm/ngữ pháp. "
                 f"Tuyệt đối KHÔNG tạo lại các chủ đề: [{curr_ban}]. "
                 f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('vocabVN', limit=50)}."
             )
@@ -714,7 +740,8 @@ def ideate_vocabvn(
         level = ""
 
         for attempt in range(max_retries):
-            topic = current_batch.get("topic", f"Đoán Hán Tự #{next_id + appended}").strip()
+            raw_topic = current_batch.get("topic", f"Đoán Hán Tự #{next_id + appended}").strip()
+            topic = clean_quiz_topic(raw_topic, tab="vocabVN")
             level = current_batch.get("level", "HSK 2")
             raw_words = current_batch.get("words", [])
 
@@ -722,7 +749,7 @@ def ideate_vocabvn(
                 print(f"  ⚠ [Gatekeeper 1 QC] Batch has {len(raw_words)} words (< 5 required). Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'fēi jī'). Không trùng [{', '.join(matrix.get_existing_topics('vocabVN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabVN')}."
+                    f"Tạo 1 chủ đề VocabVN (danh mục từ vựng đời sống 2-4 từ) gồm đúng 5 từ vựng HSK 2-3 (Pinyin có dấu cách như 'fēi jī'). Không trùng [{', '.join(matrix.get_existing_topics('vocabVN')[-20:])}]. Tránh các chữ: {matrix.get_tab_recent_50_tracked('vocabVN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -758,7 +785,7 @@ def ideate_vocabvn(
                 print(f"  ⚠ [Gatekeeper 1 QC] Anti-duplication check failed: {reason}. Retrying...")
                 retry_data, retry_provider = rotator.generate_quiz_ideas(
                     sys_prompt,
-                    f"Tạo 1 chủ đề VocabVN gồm 5 từ vựng mới hoàn toàn. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('vocabVN')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabVN')}."
+                    f"Tạo 1 chủ đề VocabVN ngắn gọn 2-4 từ gồm 5 từ vựng mới hoàn toàn. Cấm lý thuyết. Không dùng chủ đề [{', '.join(matrix.get_existing_topics('vocabVN')[-25:])}]. Tránh: {matrix.get_tab_recent_50_tracked('vocabVN')}."
                 )
                 if retry_data:
                     ret_list = retry_data if isinstance(retry_data, list) else ((retry_data or {}).get("batches") or (retry_data or {}).get("topics") or [retry_data])
@@ -832,23 +859,26 @@ def ideate_multilevels(
     sys_prompt = (
         "Bạn là chuyên gia ngôn ngữ tiếng Trung của kênh 'Lê Lê Học Tiếng Trung'. "
         "Nhiệm vụ: Tạo kịch bản video định dạng '1 Nghĩa 5 Cấp Độ HSK (1 -> 5)'. "
-        "Mỗi batch là 1 khái niệm/tính từ/động từ tiếng Việt, biểu đạt qua 5 cấp độ từ vựng HSK tăng dần. "
+        "Mỗi batch là 1 khái niệm/tính từ/động từ tiếng Việt ngắn gọn (1-3 từ, ví dụ: 'Tự Tin', 'Mệt Mỏi', 'Xinh Đẹp', 'Thành Công', 'Kiên Trì'), "
+        "biểu đạt qua 5 cấp độ từ vựng HSK tăng dần từ HSK 1 đến HSK 5. "
+        "QUY TẮC: Khái niệm ngắn gọn, súc tích, không tạo câu dài, không lý thuyết ngữ pháp. "
         "Output JSON dạng mảng: [\n"
         "  {\n"
-        "    \"concept_name_vi\": \"Tự tin / Kiêu hãnh\",\n"
+        "    \"concept_name_vi\": \"Tự Tin\",\n"
         "    \"levels\": [\n"
         "      {\"level\": 1, \"hsk\": \"HSK 1\", \"hanzi\": \"好\", \"pinyin\": \"hǎo\", \"han_viet\": \"Hảo\", \"meaning_vi\": \"Tốt\", \"nuance_note\": \"Cơ bản\", \"visual_action\": \"Gật đầu\"},\n"
         "      {\"level\": 2, \"hsk\": \"HSK 2\", \"hanzi\": \"行\", \"pinyin\": \"xíng\", \"han_viet\": \"Hành\", \"meaning_vi\": \"Được\", \"nuance_note\": \"Khá\", \"visual_action\": \"Cười nhẹ\"},\n"
-        "      {\"level\": 3, \"hsk\": \"HSK 3\", \"hanzi\": \"自信\", \"pinyin\": \"zìxìn\", \"han_viet\": \"Tự tin\", \"meaning_vi\": \"Tự tin\", \"nuance_note\": \"Rõ ràng\", \"visual_action\": \"Ưỡn ngực\"},\n"
-        "      {\"level\": 4, \"hsk\": \"HSK 4\", \"hanzi\": \"坚信\", \"pinyin\": \"jiānxìn\", \"han_viet\": \"Kiên tín\", \"meaning_vi\": \"Vững tin\", \"nuance_note\": \"Mạnh mẽ\", \"visual_action\": \"Nắm tay\"},\n"
-        "      {\"level\": 5, \"hsk\": \"HSK 5\", \"hanzi\": \"昂首阔步\", \"pinyin\": \"ángshǒukuòbù\", \"han_viet\": \"Ngẩng đầu\", \"meaning_vi\": \"Hiên ngang\", \"nuance_note\": \"Tuyệt đối\", \"visual_action\": \"Sải bước\"}\n"
+        "      {\"level\": 3, \"hsk\": \"HSK 3\", \"hanzi\": \"自信\", \"pinyin\": \"zì xìn\", \"han_viet\": \"Tự tin\", \"meaning_vi\": \"Tự tin\", \"nuance_note\": \"Rõ ràng\", \"visual_action\": \"Ưỡn ngực\"},\n"
+        "      {\"level\": 4, \"hsk\": \"HSK 4\", \"hanzi\": \"坚信\", \"pinyin\": \"jiān xìn\", \"han_viet\": \"Kiên tín\", \"meaning_vi\": \"Vững tin\", \"nuance_note\": \"Mạnh mẽ\", \"visual_action\": \"Nắm tay\"},\n"
+        "      {\"level\": 5, \"hsk\": \"HSK 5\", \"hanzi\": \"昂首阔步\", \"pinyin\": \"áng shǒu kuò bù\", \"han_viet\": \"Ngẩng đầu\", \"meaning_vi\": \"Hiên ngang\", \"nuance_note\": \"Tuyệt đối\", \"visual_action\": \"Sải bước\"}\n"
         "    ]\n"
         "  }\n"
         "]"
     )
     topics_ban_str = ", ".join(f"'{t}'" for t in existing_topics[-30:]) if existing_topics else "không có"
     user_prompt = (
-        f"Hãy tạo {count} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc hoàn toàn mới, biểu đạt sắc thái từ HSK 1 đến HSK 5. "
+        f"Hãy tạo {count} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc hoàn toàn mới. "
+        f"YÊU CẦU: Khái niệm là 1 tính từ hoặc động từ cốt lõi ngắn gọn (1-3 từ tiếng Việt), biểu đạt sắc thái từ HSK 1 đến HSK 5. "
         f"Tuyệt đối KHÔNG tạo lại hoặc tương tự các chủ đề/khái niệm sau: [{topics_ban_str}]. "
         f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {recent_50}."
     )
@@ -871,7 +901,7 @@ def ideate_multilevels(
             curr_ban = ", ".join(f"'{t}'" for t in curr_topics[-30:]) if curr_topics else "không có"
             ai_data, provider = rotator.generate_quiz_ideas(
                 sys_prompt,
-                f"Hãy tạo {remaining} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc, biểu đạt sắc thái từ HSK 1 đến HSK 5. "
+                f"Hãy tạo {remaining} chủ đề '1 Nghĩa 5 Cấp Độ HSK' đặc sắc, sâu sắc (khái niệm 1-3 từ tiếng Việt), biểu đạt sắc thái từ HSK 1 đến HSK 5. "
                 f"Tuyệt đối KHÔNG tạo lại các khái niệm: [{curr_ban}]. "
                 f"Tuyệt đối KHÔNG trùng lặp các chữ Hán sau: {matrix.get_tab_recent_50_tracked('multilevels', limit=50)}."
             )
@@ -893,8 +923,8 @@ def ideate_multilevels(
 
         for attempt in range(max_retries):
             raw_concept = current_batch.get("concept_name_vi", "") or current_batch.get("concept", f"Khái niệm #{next_id + appended}")
-            clean_concept = raw_concept.replace("1 Nghĩa 5 Cấp •", "").replace("1 Nghĩa 5 Cấp", "").strip()
-            topic_title = f"1 Nghĩa 5 Cấp • {clean_concept}" if clean_concept else raw_concept
+            topic_title = clean_quiz_topic(raw_concept, tab="multilevels")
+            clean_concept = topic_title.replace("1 Nghĩa 5 Cấp •", "").strip()
             raw_levels = current_batch.get("levels", [])
 
             if len(raw_levels) < 5:

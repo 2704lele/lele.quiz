@@ -22,6 +22,8 @@ if PROJECT_ROOT not in sys.path:
 from scripts.linguistic_qc import (
     GlobalHanziFrequencyMatrix,
     normalize_topic_string,
+    clean_quiz_topic,
+    validate_topic_spirit,
 )
 
 
@@ -29,8 +31,59 @@ def test_normalize_topic_string():
     """Verify topic normalization strips prefixes, punctuation, and unifies symbols."""
     assert normalize_topic_string("1 Nghĩa 5 Cấp • Tự tin / Kiêu hãnh") == "tự tin kiêu hãnh"
     assert normalize_topic_string("1 Nghĩa 5 Cấp - Vui vẻ & Hạnh phúc") == "vui vẻ và hạnh phúc"
-    assert normalize_topic_string("Đồ Ăn & Thức Uống (HSK 1)") == "đồ ăn và thức uống hsk 1"
+    assert normalize_topic_string("Đồ Ăn & Thức Uống (HSK 1)") == "đồ ăn và thức uống"
+    assert normalize_topic_string("Chủ đề: Đồ Ăn & Thức Uống") == "đồ ăn và thức uống"
     assert normalize_topic_string("  Phương Tiện Giao Thông!  ") == "phương tiện giao thông"
+
+
+def test_clean_quiz_topic():
+    """Verify clean_quiz_topic strips prefixes, HSK tags, and formats multilevels."""
+    assert clean_quiz_topic("Chủ đề: Đồ Gia Dụng (HSK 1)") == "Đồ Gia Dụng"
+    assert clean_quiz_topic("Thử thách: Rau Củ Quả [HSK 2]") == "Rau Củ Quả"
+    assert clean_quiz_topic("Từ vựng về: Phương Tiện Giao Thông") == "Phương Tiện Giao Thông"
+    assert clean_quiz_topic("1 Nghĩa 5 Cấp • Tự Tin (HSK 1-5)", tab="multilevels") == "1 Nghĩa 5 Cấp • Tự Tin"
+    assert clean_quiz_topic("Khái niệm: Vui Vẻ", tab="multilevels") == "1 Nghĩa 5 Cấp • Vui Vẻ"
+
+
+def test_validate_topic_spirit():
+    """Verify validate_topic_spirit rejects phonetic theory topics and overly long topics."""
+    # Valid concise topics
+    valid, errs = validate_topic_spirit("Đồ Gia Dụng", "pinyin")
+    assert valid is True
+    assert len(errs) == 0
+
+    valid, errs = validate_topic_spirit("Phương Tiện Giao Thông", "vocabCN")
+    assert valid is True
+
+    # Banned phonetic theory topics
+    valid, errs = validate_topic_spirit("Thử thách Phân biệt Thanh điệu 1 và 4", "pinyin")
+    assert valid is False
+    assert "thanh điệu" in errs[0].lower()
+
+    valid, errs = validate_topic_spirit("Luyện đọc Thanh nhẹ và Biến điệu", "pinyin")
+    assert valid is False
+
+    valid, errs = validate_topic_spirit("Phân biệt Âm bật hơi", "pinyin")
+    assert valid is False
+
+    # Overly long topic
+    valid, errs = validate_topic_spirit("Tổng hợp các loại từ vựng chỉ đồ ăn thức uống ngon miệng", "pinyin")
+    assert valid is False
+    assert "quá dài" in errs[0].lower()
+
+
+def test_matrix_evaluate_rejects_banned_phonetic_theory_topic():
+    """Verify evaluate_candidate_batch rejects topics with phonetic theory keywords."""
+    matrix = GlobalHanziFrequencyMatrix(spreadsheet_client=None)
+    candidate_words = [
+        {"hanzi": "香蕉", "pinyin": "xiāng jiāo", "meaning": "quả chuối"},
+        {"hanzi": "西瓜", "pinyin": "xī guā", "meaning": "dưa hấu"}
+    ]
+    is_valid, ratio, errs, reason = matrix.evaluate_candidate_batch(
+        candidate_words, topic="Luyện đọc Thanh nhẹ tiếng Trung", tab="pinyin"
+    )
+    assert is_valid is False
+    assert "Topic Spirit" in reason
 
 
 def test_matrix_topic_deduplication_detection():

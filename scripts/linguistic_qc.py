@@ -117,6 +117,94 @@ def is_dummy_word(hanzi: str, pinyin: str = "", meaning: str = "") -> bool:
     return False
 
 
+BANNED_THEORY_TOPIC_KEYWORDS: List[str] = [
+    "thanh điệu", "thanh nhẹ", "bật hơi", "uốn lưỡi", "vận mẫu", "thanh mẫu",
+    "phát âm", "biến điệu", "âm tiết", "quy tắc", "khẩu hình", "nhận diện pinyin",
+    "phân biệt âm", "luyện đọc", "thử thách phát âm", "chữ hán cơ bản", "ngữ pháp",
+    "cấu trúc câu", "trợ từ", "giới từ", "ngữ âm"
+]
+
+
+def clean_quiz_topic(raw_topic: str, tab: str = "") -> str:
+    """
+    Sanitizes and cleans quiz topic names:
+    - Strips noisy prefixes like 'Chủ đề: ', 'Thử thách: ', 'Luyện tập: ', 'Từ vựng về: ', 'Bộ từ vựng: ', 'Chủ đề [0-9]+: '
+    - Strips level suffixes like ' (HSK 1)', ' [HSK 2]', ' (HSK 1-3)', ' (HSK 1 - 5)'
+    - Strips trailing punctuation, quotes, excess whitespace
+    - Preserves '1 Nghĩa 5 Cấp • <Concept>' format for multilevels tab if applicable
+    """
+    if not raw_topic:
+        return ""
+    t = str(raw_topic).strip()
+    # Strip surrounding quotes
+    t = re.sub(r"^[\"\'\`]+|[\"\'\`]+$", "", t).strip()
+
+    is_ml = (str(tab).strip().lower() in ["multilevels", "ml"])
+    if is_ml:
+        # Multilevels format: 1 Nghĩa 5 Cấp • <Concept>
+        concept = re.sub(r"^1\s*nghĩa\s*5\s*cấp\s*[•\-\:\.]\s*", "", t, flags=re.IGNORECASE).strip()
+        concept = re.sub(r"^1\s*nghĩa\s*5\s*cấp\s*", "", concept, flags=re.IGNORECASE).strip()
+        concept = re.sub(r"\s*[\(\[]\s*(HSK|Level)[^\)\]]*[\)\]]", "", concept, flags=re.IGNORECASE).strip()
+        concept = re.sub(r"^(Chủ đề|Khái niệm)\s*[:\-\.]?\s*", "", concept, flags=re.IGNORECASE).strip()
+        concept = re.sub(r"^[:\-\.•\s]+|[:\-\.•\s]+$", "", concept).strip()
+        return f"1 Nghĩa 5 Cấp • {concept}" if concept else t
+
+    # For standard tabs (pinyin, vocabCN, vocabVN):
+    # 1. Remove HSK/Level suffixes: (HSK 1), [HSK 2], (HSK 1-3), etc.
+    t = re.sub(r"\s*[\(\[]\s*(HSK|Level)[^\)\]]*[\)\]]", "", t, flags=re.IGNORECASE).strip()
+
+    # 2. Remove common noisy prefixes
+    prefixes_to_strip = [
+        r"^Chủ đề\s*(số\s*)?\d+\s*[:\-\.]?\s*",
+        r"^Chủ đề\s*[:\-\.]?\s*",
+        r"^Thử thách\s*[:\-\.]?\s*",
+        r"^Luyện tập\s*[:\-\.]?\s*",
+        r"^Bộ từ vựng\s*(về)?\s*[:\-\.]?\s*",
+        r"^Từ vựng\s*(về)?\s*[:\-\.]?\s*",
+        r"^Đoán nghĩa\s*(tiếng việt)?\s*[:\-\.]?\s*",
+        r"^Đoán chữ hán\s*[:\-\.]?\s*",
+        r"^Trắc nghiệm\s*[:\-\.]?\s*",
+    ]
+    for pattern in prefixes_to_strip:
+        t = re.sub(pattern, "", t, flags=re.IGNORECASE).strip()
+
+    # Clean redundant punctuation and spacing
+    t = re.sub(r"^[:\-\.•\s]+|[:\-\.•\s]+$", "", t).strip()
+    return t
+
+
+def validate_topic_spirit(topic: str, tab: str = "") -> Tuple[bool, List[str]]:
+    """
+    Validates that a quiz topic adheres to the core spirit of short-form vocabulary quiz:
+    1. Everyday practical vocabulary categories (Food, Animals, Furniture, Jobs, Weather, etc.).
+    2. NO theoretical phonetic / pronunciation drill topics (no thanh điệu, thanh nhẹ, âm bật hơi, etc.).
+    3. Topic length is concise (typically 2-4 words, max 6 words).
+    """
+    errors: List[str] = []
+    if not topic or not str(topic).strip():
+        return False, ["Tên chủ đề trống."]
+
+    clean = clean_quiz_topic(topic, tab)
+    test_str = clean.replace("1 Nghĩa 5 Cấp •", "").strip().lower()
+
+    # Check banned theory keywords
+    for kw in BANNED_THEORY_TOPIC_KEYWORDS:
+        if kw in test_str:
+            errors.append(
+                f"Chủ đề chứa từ khóa lý thuyết/ngữ âm bị cấm: '{kw}'. "
+                f"Quiz chỉ dùng các chủ đề từ vựng đời sống thực tế ngắn gọn (2-4 từ)."
+            )
+
+    # Word count check
+    words = test_str.split()
+    if len(words) > 6:
+        errors.append(f"Tên chủ đề quá dài ({len(words)} từ > 6 từ cho phép). Quiz chỉ cần chủ đề ngắn gọn 2-4 từ.")
+    elif len(words) < 1:
+        errors.append("Tên chủ đề không có nội dung hợp lệ.")
+
+    return len(errors) == 0, errors
+
+
 def normalize_topic_string(topic: str) -> str:
     """Normalizes topic strings for canonical comparison and duplicate detection."""
     if not topic:
@@ -124,6 +212,8 @@ def normalize_topic_string(topic: str) -> str:
     t = str(topic).strip().lower()
     t = re.sub(r"^1\s*nghĩa\s*5\s*cấp\s*[•\-\:\.]\s*", "", t)
     t = re.sub(r"^1\s*nghĩa\s*5\s*cấp\s*", "", t)
+    t = re.sub(r"[\(\[]\s*(hsk|level)[^\)\]]*[\)\]]", "", t)
+    t = re.sub(r"^(chủ đề\s*(số\s*)?\d+|chủ đề|thử thách|luyện tập|bộ từ vựng|từ vựng về|từ vựng)\s*[:\-\.]?\s*", "", t)
     t = t.replace("&", " và ")
     t = re.sub(r"[\(\)\[\]\{\}\/\\,;:\.!\?•\-—_]", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
@@ -282,11 +372,12 @@ class GlobalHanziFrequencyMatrix:
         Incrementally registers a newly ingested batch into topic registries, word banks,
         tab-isolated history, and the global sliding window.
         """
-        if topic and tab in self.tab_topics:
-            norm_t = normalize_topic_string(topic)
+        clean_t = clean_quiz_topic(topic, tab) if topic else ""
+        if clean_t and tab in self.tab_topics:
+            norm_t = normalize_topic_string(clean_t)
             if norm_t:
                 self.tab_topics[tab].add(norm_t)
-            self.tab_raw_topics[tab].append(topic)
+            self.tab_raw_topics[tab].append(clean_t)
 
         new_chars: List[str] = []
         for w in batch_words:
@@ -335,16 +426,24 @@ class GlobalHanziFrequencyMatrix:
     ) -> Tuple[bool, float, List[str], str]:
         """
         Evaluates candidate batch against:
-        1. Strict Zero-Duplicate Topic policy.
-        2. Exact Duplicate Hanzi Word policy within tab.
-        3. Tab-Isolated Hanzi Character Overlap (< 35%).
-        4. Global Hanzi Character Overlap (< 40%).
+        1. Topic Spirit & Length QC (Banned phonetic theory & concise 2-4 words).
+        2. Strict Zero-Duplicate Topic policy.
+        3. Exact Duplicate Hanzi Word policy within tab.
+        4. Tab-Isolated Hanzi Character Overlap (< 35%).
+        5. Global Hanzi Character Overlap (< 40%).
         Returns (is_valid, overlap_ratio, overlap_list, reason).
         """
-        # 1. Topic Duplicate QC
+        # 1. Topic Spirit & Length QC
+        if topic:
+            t_valid, t_errs = validate_topic_spirit(topic, tab)
+            if not t_valid:
+                return False, 1.0, [topic], f"Rejected (Topic Spirit): {t_errs[0]}"
+
+        # 2. Topic Duplicate QC
         if topic and tab:
-            if self.is_topic_duplicated(tab, topic):
-                return False, 1.0, [topic], f"Rejected (Duplicate Topic): Chủ đề '{topic}' đã tồn tại trong tab '{tab}'."
+            clean_t = clean_quiz_topic(topic, tab)
+            if self.is_topic_duplicated(tab, clean_t) or self.is_topic_duplicated(tab, topic):
+                return False, 1.0, [clean_t or topic], f"Rejected (Duplicate Topic): Chủ đề '{clean_t or topic}' đã tồn tại trong tab '{tab}'."
 
         batch_words_set: Set[str] = set()
         batch_chars: Set[str] = set()
