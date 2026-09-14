@@ -1,0 +1,121 @@
+name: "05 - Quiz Historical Deduplication & In-Place Repair"
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      tab:
+        description: "Target Quiz Tab"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "pinyin"
+          - "vocabCN"
+          - "vocabVN"
+          - "multilevels"
+      mode:
+        description: "Execution Mode"
+        required: true
+        default: "repair"
+        type: choice
+        options:
+          - "repair"
+          - "dry_run"
+      no_fix_spirit:
+        description: "Skip fixing theory/spirit issues (only exact duplicate topics)"
+        required: false
+        default: false
+        type: boolean
+  repository_dispatch:
+    types: [quiz_dedup_audit]
+
+permissions:
+  contents: read
+
+jobs:
+  dedup_audit_and_repair:
+    name: "Historical Deduplication & In-Place Repair"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python 3.10"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: "Install Python Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install gspread google-api-python-client google-auth google-auth-oauthlib pypinyin requests rich pyyaml
+
+      - name: "Configure Zero-Leak Vault Credentials"
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_OAUTH_JSON: ${{ secrets.GOOGLE_USER_OAUTH2_JSON }}
+          GEMINI_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          AGNES_KEYS: ${{ secrets.AGNES_API_KEYS }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_sa
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/google_oauth
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/gemini
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/agnes
+          mkdir -p ~/.cloud-profiles/lelehoctiengtrung/telegram
+
+          if [ -n "$GCP_SA_KEY" ]; then
+            printf '%s\n' "$GCP_SA_KEY" > ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json
+          fi
+
+          if [ -n "$GOOGLE_OAUTH_JSON" ]; then
+            printf '%s\n' "$GOOGLE_OAUTH_JSON" > ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json
+          fi
+
+          if [ -n "$GEMINI_KEYS" ]; then
+            printf '%s\n' "$GEMINI_KEYS" > ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/gemini/api_keys.json
+          fi
+
+          if [ -n "$AGNES_KEYS" ]; then
+            printf '%s\n' "$AGNES_KEYS" > ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/agnes/api_keys.json
+          fi
+
+          if [ -n "$TELEGRAM_TOKEN" ]; then
+            echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN" > ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT:--1004392602002}" >> ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+            chmod 600 ~/.cloud-profiles/lelehoctiengtrung/telegram/telegram.env
+          fi
+
+      - name: "Execute Historical Deduplication & In-Place Repair"
+        env:
+          TARGET_TAB: ${{ github.event.inputs.tab || github.event.client_payload.tab || 'all' }}
+          EXEC_MODE: ${{ github.event.inputs.mode || github.event.client_payload.mode || 'repair' }}
+          NO_FIX_SPIRIT: ${{ github.event.inputs.no_fix_spirit || false }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '-1004392602002' }}
+        run: |
+          ARGS="--tab ${TARGET_TAB}"
+          if [ "$EXEC_MODE" = "dry_run" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ "$NO_FIX_SPIRIT" = "true" ]; then
+            ARGS="$ARGS --no-fix-spirit"
+          fi
+          echo "🚀 Running Historical Deduplication Engine with ARGS: $ARGS"
+          python3 scripts/audit_and_repair_historical_duplicates.py $ARGS
+
+      - name: "Enforce 21px Row Height Invariant"
+        if: always()
+        run: |
+          python3 scripts/enforce_row_height_21px.py

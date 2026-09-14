@@ -383,7 +383,7 @@ class ResilientAIKeyRotator:
                 )
 
                 try:
-                    with urllib.request.urlopen(req, timeout=35) as resp:
+                    with urllib.request.urlopen(req, timeout=15) as resp:
                         res_data = json.loads(resp.read().decode("utf-8"))
                         text = res_data["candidates"][0]["content"]["parts"][0]["text"]
                         parsed = self._extract_json(text)
@@ -504,7 +504,7 @@ class ResilientAIKeyRotator:
                 )
 
                 try:
-                    with urllib.request.urlopen(req, timeout=30) as resp:
+                    with urllib.request.urlopen(req, timeout=8) as resp:
                         res_data = json.loads(resp.read().decode("utf-8"))
                         text = res_data["choices"][0]["message"]["content"]
                         parsed = self._extract_json(text)
