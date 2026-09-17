@@ -1,10 +1,7 @@
-name: "04 - Quiz Social Media Distribution (Gatekeeper 3 Guard)"
+name: "04 - Quiz Social Media Distribution (Manual Review & Dispatch Only)"
 
 on:
-  schedule:
-    - cron: '0 0 * * *'
-  repository_dispatch:
-    types: [quiz_social_distribution, quiz_publish]
+  # CẤM ĐĂNG TỰ ĐỘNG: Đã gỡ bỏ schedule cron. Phải do Người dùng (anh Hoàng) tự kiểm duyệt và kích hoạt thủ công.
   workflow_dispatch:
     inputs:
       tab:
