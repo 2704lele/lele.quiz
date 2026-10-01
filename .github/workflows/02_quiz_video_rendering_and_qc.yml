@@ -1,8 +1,6 @@
 name: "02 - Quiz Video Rendering & Auto-QC (Gatekeeper 2 QC)"
 
 on:
-  schedule:
-    - cron: '30 18,22,2,6,10,14 * * *'
   workflow_dispatch:
     inputs:
       tab:
@@ -108,20 +106,3 @@ jobs:
         if: always()
         run: |
           python3 scripts/enforce_row_height_21px.py
-
-      - name: "Notify Completion to Telegram"
-        if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '-1004392602002' }}
-        run: |
-          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-            STATUS="${{ job.status }}"
-            if [ "$STATUS" = "success" ]; then
-              MSG="🎬 <b>[GHA Video Render Thành Công]</b>%0AStatus: <b>✅ SUCCESS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0AToàn bộ video xử lý đã được upload lên Google Drive và chuyển sang trạng thái <b>Ready</b> (21px locked)."
-            else
-              MSG="🚨 <b>[GHA Video Render THẤT BẠI]</b>%0AStatus: <b>❌ FAILURE</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0A⚠ Tiến trình render hoặc upload lên Google Drive bị lỗi. Không có video mới được cập nhật vào Ready!"
-            fi
-            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
-          fi

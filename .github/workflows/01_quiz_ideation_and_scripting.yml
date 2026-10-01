@@ -1,8 +1,6 @@
 name: "01 - Quiz Ideation & Scripting (Gatekeeper 1 QC)"
 
 on:
-  schedule:
-    - cron: '0 17 * * *'
   workflow_dispatch:
     inputs:
       tab:
@@ -106,20 +104,3 @@ jobs:
         if: always()
         run: |
           python3 scripts/enforce_row_height_21px.py
-
-      - name: "Notify Completion to Telegram"
-        if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '-1004392602002' }}
-        run: |
-          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-            STATUS="${{ job.status }}"
-            if [ "$STATUS" = "success" ]; then
-              MSG="💡 <b>[GHA Ideation Thành Công]</b>%0AStatus: <b>✅ SUCCESS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0ABatches: <code>${{ github.event.inputs.batch_count || '5' }}</code>%0ACác dòng mới đã được tạo và chuyển sang <b>Pending</b> (21px locked)."
-            else
-              MSG="🚨 <b>[GHA Ideation THẤT BẠI]</b>%0AStatus: <b>❌ FAILURE</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0A⚠ Quá trình sinh nội dung AI gặp lỗi!"
-            fi
-            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
-          fi

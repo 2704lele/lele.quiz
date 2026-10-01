@@ -121,16 +121,3 @@ jobs:
         if: always()
         run: |
           python3 scripts/enforce_row_height_21px.py
-
-      - name: "Notify Completion to Telegram"
-        if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '-1004392602002' }}
-        run: |
-          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-            STATUS="${{ job.status }}"
-            MSG="🚀 <b>[GHA Social Distribution Complete]</b>%0AStatus: <b>$STATUS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0AAll eligible Ready videos have been scheduled to Buffer (YouTube Shorts, TikTok, Facebook Reels)."
-            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
-          fi
