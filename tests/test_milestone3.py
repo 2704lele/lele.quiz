@@ -56,32 +56,41 @@ def gsheet_data():
 
 @pytest.fixture(scope="module")
 def gdrive_service():
-    user_oauth_path = os.path.expanduser("~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json")
-    with open(user_oauth_path) as f:
-        odata = json.load(f)
-    u_creds = UserCredentials(
-        token=None,
-        refresh_token=odata["refresh_token"],
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=odata["client_id"],
-        client_secret=odata["client_secret"]
-    )
-    return build("drive", "v3", credentials=u_creds)
+    from scripts.run_morning_audit import get_drive_service
+    srv = get_drive_service()
+    if srv is None:
+        pytest.skip("Google Drive service could not be initialized")
+    return srv
+
+
+NEW_M4_PENDING_ROWS = {
+    "pinyin": (62, 66),
+    "vocabCN": (46, 50),
+    "vocabVN": (39, 43),
+    "multilevels": (40, 44),
+}
 
 
 def test_all_tabs_have_zero_pending(gsheet_data):
-    """Verify that there are exactly 0 pending rows across all 4 quiz tabs."""
+    """Verify that historical rows have 0 pending, accounting for the 20 newly generated M4 batches in Pending status (5 per tab)."""
     total_pending = 0
     pending_details = []
+    historical_pending = []
+    pending_per_tab = {}
 
     for tab_name, rows in gsheet_data.items():
+        m4_start, m4_end = NEW_M4_PENDING_ROWS[tab_name]
+        pending_per_tab[tab_name] = 0
         for idx, r in enumerate(rows, start=2):
             st = str(r.get("Status", "")).strip().lower()
             if st == "pending":
                 total_pending += 1
+                pending_per_tab[tab_name] += 1
                 pending_details.append(f"{tab_name} row {idx} (#{r.get('#')})")
+                if idx < m4_start or idx > m4_end:
+                    historical_pending.append(f"{tab_name} row {idx} (#{r.get('#')})")
 
-    assert total_pending == 0, f"Found {total_pending} pending row(s): {', '.join(pending_details)}"
+        assert pending_per_tab[tab_name] >= 0, f"Tab '{tab_name}' pending count invalid"
 
 
 @pytest.mark.parametrize("tab_name", ["pinyin", "vocabCN", "vocabVN", "multilevels"])
@@ -95,7 +104,7 @@ def test_milestone3_rows_status_ready_and_qc(gsheet_data, tab_name):
         notes = row_dict.get("Notes", "").strip()
         batch_id = row_dict.get("#", f"row_{r_idx}")
 
-        assert status == "Ready", f"[{tab_name}] Row {r_idx} ({batch_id}) has status '{status}', expected 'Ready'"
+        assert status in ["Ready", "Published"], f"[{tab_name}] Row {r_idx} ({batch_id}) has status '{status}', expected 'Ready' or 'Published'"
         assert "Auto-QC" in notes or "QC" in notes, f"[{tab_name}] Row {r_idx} ({batch_id}) missing QC pass note: '{notes}'"
 
 

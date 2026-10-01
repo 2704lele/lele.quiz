@@ -66,3 +66,16 @@ def test_telegram_credential_resolution_and_format():
     assert chat_id, "Telegram chat ID should be resolved"
     assert ":" in token, "Telegram bot token format invalid (expected '<bot_id>:<hash>')"
     assert chat_id.lstrip("-").isdigit(), "Telegram chat ID should be numeric"
+
+
+def test_row_id_parity_invariant():
+    """Verify that 100% of data rows across all 4 tabs have Column A strictly equal to '#<RowIndex>' (0 mismatches)."""
+    from scripts.reconcile_row_ids import reconcile_all_tabs, SPREADSHEET_ID
+    from scripts.enforce_row_height_21px import get_sheets_service
+
+    service = get_sheets_service()
+    res = reconcile_all_tabs(service=service, spreadsheet_id=SPREADSHEET_ID, dry_run=True)
+    assert res["mismatches"] == 0, f"Detected {res['mismatches']} row ID mismatches: {res}"
+    for tab, tab_res in res["tabs"].items():
+        assert tab_res["mismatches"] == 0, f"Tab {tab} has {tab_res['mismatches']} row ID mismatches"
+        assert tab_res["total_rows"] > 0, f"Tab {tab} unexpectedly has 0 rows"

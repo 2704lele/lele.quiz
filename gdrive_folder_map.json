@@ -2,9 +2,9 @@
   "project_name": "lelehoctiengtrung_quiz",
   "version": "2.0",
   "spreadsheet_id": "1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0",
-  "code_sync_folder_id": "1C-n3Un-D6Teu4LapgIWWeVZ6l7toH8lm",
-  "backup_folder_id": "1QHYaOfvE8yoShR4UcM0o3zd0uOh7rhaK",
-  "_backup_folder_id": "1QHYaOfvE8yoShR4UcM0o3zd0uOh7rhaK",
+  "code_sync_folder_id": "1ZbKUM09_mbRo7yOSOIWYmwsaIW1SvwMh",
+  "backup_folder_id": "1KFggc1ApUEsBxkX3-Bs62Wy-lYDCqlW3",
+  "_backup_folder_id": "1KFggc1ApUEsBxkX3-Bs62Wy-lYDCqlW3",
   "row_height_px": 21,
   "standard_columns_count": 16,
   "tabs": {
@@ -37,5 +37,5 @@
       "description": "1 Core Meaning across 5 HSK Levels (30s Short)"
     }
   },
-  "target_folder_id": "1C-n3Un-D6Teu4LapgIWWeVZ6l7toH8lm"
+  "target_folder_id": "1ZbKUM09_mbRo7yOSOIWYmwsaIW1SvwMh"
 }

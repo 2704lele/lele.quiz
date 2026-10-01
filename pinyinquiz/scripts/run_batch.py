@@ -323,6 +323,22 @@ def run_batch_job(
                 except Exception as me:
                     logger.error(f"Metadata generation error: {me}")
 
+            if upload_gdrive and not gdrive_link:
+                logger.error(f"❌ Batch [{row_id}] rendered locally ({video_path}) but FAILED to upload to Google Drive! Keeping status as Failed.")
+                if gsheet_mgr and row_index > 0:
+                    gsheet_mgr.update_batch_status(
+                        row_index=row_index,
+                        status="Failed",
+                        video_link="",
+                        metadata_link=metadata_text
+                    )
+                    try:
+                        now_str = get_vietnam_now_str()
+                        gsheet_mgr.worksheet.update_cell(row_index, 16, f"[Lỗi Upload Drive: Thất bại tải video lên GDrive lúc {now_str} (GMT+7)]")
+                    except Exception:
+                        pass
+                continue
+
             if gsheet_mgr and row_index > 0:
                 # Update status to 'Video', Video column to GDrive link, metadata directly into cell
                 gsheet_mgr.update_batch_status(

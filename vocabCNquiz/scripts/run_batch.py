@@ -135,6 +135,11 @@ def process_batch(batch_row: dict, gsheet: GSheetManager, uploader: GDriveUpload
     logger.info(f"Uploading video {video_output_name} to Google Drive...")
     gdrive_video_link = uploader.upload_file(local_video_path, remote_filename=video_output_name, mime_type="video/mp4")
     
+    if not gdrive_video_link:
+        logger.error(f"❌ Google Drive upload failed for batch {batch_id}")
+        gsheet.update_batch_status(row_num, "Failed", notes=f"Google Drive upload failed at {get_vietnam_now_str()}")
+        return False
+
     gdrive_thumb_link = ""
     if os.path.exists(thumb_path):
         gdrive_thumb_link = uploader.upload_file(thumb_path, remote_filename=f"cover_batch_{clean_id}.jpg", mime_type="image/jpeg")

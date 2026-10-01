@@ -36,11 +36,18 @@ pip install -r pinyinquiz/requirements.txt rich pytest
 # Direct CLI: python3 scripts/run_render_dispatcher.py --tab pinyin --row 54 --quality qh
 ```
 
-### Social Publishing (Buffer API)
+### Social Publishing (Buffer API - Manual Approval Only)
 ```bash
 ./quick_publish.sh [tab] [row_id] [channels]
 # Example: ./quick_publish.sh pinyin 2 buffer1
 # Direct CLI: python3 scripts/publish_social_batch.py --tab pinyin --id 2 --channels buffer1
+```
+
+### Hermes Agent Launcher
+```bash
+./hermes.sh           # Start interactive Hermes Agent in current directory
+./hermes.sh --tui     # Start Hermes in modern TUI mode
+./hermes.sh -c        # Resume latest Hermes session
 ```
 
 ### Auditing & Invariant Maintenance

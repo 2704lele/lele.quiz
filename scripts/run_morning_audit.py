@@ -25,13 +25,18 @@ if QUIZ_ROOT not in sys.path:
 
 from typing import Optional, Dict, Any, List, Set, Tuple
 
-from scripts.enforce_row_height_21px import RowHeightEnforcer
+from scripts.enforce_row_height_21px import (
+    RowHeightEnforcer,
+    SPREADSHEET_ID,
+    get_sheets_service,
+)
+from scripts.reconcile_row_ids import reconcile_all_tabs
 
 TABS = ["pinyin", "vocabCN", "vocabVN", "multilevels"]
 
 GDRIVE_ROOT_FOLDER_ID = "1Y240J5-oXA-UDm2IKvp7qCBVsRempbCB"
 CANONICAL_DRIVE_SUBFOLDERS = {
-    "00.codebases": "1C-n3Un-D6Teu4LapgIWWeVZ6l7toH8lm",
+    "00.codebases": "1ZbKUM09_mbRo7yOSOIWYmwsaIW1SvwMh",
     "01.pinyinquiz": "1f2mFUgpz_pYn3y9HqeHyOG9DzPMVH9QY",
     "02.vocabCNquiz": "1eI7I4jQqGBjD7MC_NXJ4zwFANxrcZM1E",
     "03.vocabVNquiz": "1VPqs9h4LLmmmXWKDGWoAz1fUCylVLK2H",
@@ -319,39 +324,80 @@ def main():
     total_pending = 0
     total_published = 0
     total_failed = 0
+    total_rendering = 0
+    total_anomalies = 0
+    all_anomalies_details = []
 
     for tab in TABS:
         ok, rows, msg = fetch_tab_raw_values(tab, client=client, use_cache=False)
         if not ok or not rows or len(rows) < 2:
-            tab_summaries[tab] = {"total": 0, "ready": 0, "pending": 0, "published": 0}
+            tab_summaries[tab] = {"total": 0, "ready": 0, "pending": 0, "published": 0, "rendering": 0, "anomalies": []}
             continue
 
         ready = 0
         pending = 0
         published = 0
         failed = 0
+        rendering = 0
+        tab_anomalies = []
+        rows_to_heal = []
         latest_ready_links = []
 
-        for r in rows[1:]:
+        for idx, r in enumerate(rows[1:], start=2):
             status = r[3].strip() if len(r) > 3 else ""
             link = r[10].strip() if len(r) > 10 else ""
             rid = r[0].strip() if len(r) > 0 else ""
 
             if status == "Ready":
-                ready += 1
                 if link and link.startswith("http"):
+                    ready += 1
                     latest_ready_links.append((rid, link))
+                else:
+                    tab_anomalies.append(f"{rid} (Status 'Ready' nhưng thiếu Link Video)")
+                    rows_to_heal.append((idx, rid, f"Ready nhưng thiếu link"))
             elif status == "Pending":
                 pending += 1
             elif status == "Published":
                 published += 1
+            elif status in ["Rendering", "In Progress"]:
+                rendering += 1
+                tab_anomalies.append(f"{rid} (Kẹt ở '{status}')")
+                rows_to_heal.append((idx, rid, f"Kẹt ở trạng thái {status}"))
+            elif status == "Video":
+                if not link or not link.startswith("http"):
+                    tab_anomalies.append(f"{rid} (Status 'Video' nhưng chưa có link GDrive)")
+                    rows_to_heal.append((idx, rid, f"Video nhưng thiếu link Drive"))
+                else:
+                    ready += 1
             elif "fail" in status.lower() or "err" in status.lower():
                 failed += 1
+            else:
+                if status:
+                    tab_anomalies.append(f"{rid} (Trạng thái lạ: '{status}')")
+
+        # Auto-Heal stuck rows back to 'Pending' on Google Sheets
+        healed_in_tab = 0
+        if rows_to_heal:
+            try:
+                ws_obj = client.open_by_key(SPREADSHEET_ID).worksheet(tab)
+                for r_num, r_id_str, reason in rows_to_heal:
+                    ws_obj.update_cell(r_num, 4, "Pending")
+                    ws_obj.update_cell(r_num, 16, f"[Auto-Heal: Khôi phục về Pending do {reason} lúc {now_vn}]")
+                    healed_in_tab += 1
+                print(f"  🛠️ [Auto-Heal] Đã tự động khôi phục {healed_in_tab} dòng kẹt ở tab '{tab}' về 'Pending'.")
+                pending += healed_in_tab
+                rendering = max(0, rendering - healed_in_tab)
+            except Exception as he:
+                print(f"  ⚠ [Auto-Heal Warning] Không thể auto-heal tab '{tab}': {he}")
 
         total_ready += ready
         total_pending += pending
         total_published += published
         total_failed += failed
+        total_rendering += rendering
+        total_anomalies += len(tab_anomalies)
+        if tab_anomalies:
+            all_anomalies_details.append((tab, tab_anomalies, healed_in_tab))
 
         tab_summaries[tab] = {
             "total": len(rows) - 1,
@@ -359,9 +405,12 @@ def main():
             "pending": pending,
             "published": published,
             "failed": failed,
+            "rendering": rendering,
+            "anomalies": tab_anomalies,
+            "healed": healed_in_tab,
             "sample_links": latest_ready_links[-3:]
         }
-        print(f"  • Tab '{tab:<12}': Total={len(rows)-1} | Ready={ready} | Pending={pending} | Published={published}")
+        print(f"  • Tab '{tab:<12}': Total={len(rows)-1} | Ready={ready} | Pending={pending} | Published={published} | Anomalies={len(tab_anomalies)} | Healed={healed_in_tab}")
 
     # Enforce row height invariant
     print("\n📏 Enforcing strict 21px row height invariant...")
@@ -371,6 +420,18 @@ def main():
         rh_status = "PASSED (100% 21px)"
     except Exception as e:
         rh_status = f"Warning: {e}"
+
+    # Enforce Column A 1:1 Row-ID parity invariant (#k == row k)
+    print("\n🔢 Auditing and enforcing Column A 1:1 Row-ID parity invariant...")
+    try:
+        sheets_service = get_sheets_service()
+        row_id_res = reconcile_all_tabs(service=sheets_service, spreadsheet_id=SPREADSHEET_ID, dry_run=False)
+        mismatches_repaired = row_id_res.get("mismatches", 0)
+        row_id_status = f"PASSED (100% Parity - {mismatches_repaired} repaired)" if mismatches_repaired > 0 else "PASSED (100% Parity)"
+        print(f"✓ Column A Row-ID Parity Invariant: {row_id_status}")
+    except Exception as e:
+        row_id_status = f"Warning: {e}"
+        print(f"⚠ Column A Row-ID Parity Invariant Warning: {e}")
 
     # Enforce Google Drive canonical subfolders & 0 orphan files invariant
     print("\n📁 Auditing Google Drive canonical subfolders & 0 orphan files invariant...")
@@ -392,24 +453,51 @@ def main():
         f"────────────────────────────",
         f"📊 <b>Tổng Hợp Trạng Thái Video:</b>",
         f"• 🟢 <b>Sẵn Sàng Xuất Bản (Ready):</b> {total_ready} videos",
-        f"• 🟡 <b>Đang Chờ (Pending):</b> {total_pending} dòng",
+        f"• 🟡 <b>Đang Chờ Render (Pending):</b> {total_pending} dòng",
         f"• 🔵 <b>Đã Đăng (Published):</b> {total_published} videos",
+    ]
+
+    total_all_healed = sum(t.get("healed", 0) for t in tab_summaries.values())
+    if total_all_healed > 0:
+        report_lines.append(f"• 🛠️ <b>Đã Tự Động Auto-Heal:</b> {total_all_healed} dòng kẹt/thiếu link về <code>Pending</code>!")
+
+    if total_rendering > 0:
+        report_lines.append(f"• ⏳ <b>Đang Render (Rendering):</b> {total_rendering} dòng")
+    if total_failed > 0:
+        report_lines.append(f"• 🔴 <b>Lỗi (Failed):</b> {total_failed} dòng")
+    if total_anomalies > 0:
+        report_lines.append(f"• 🚨 <b>CẢNH BÁO BẤT THƯỜNG / THIẾU LINK:</b> {total_anomalies} dòng!")
+
+    report_lines.extend([
         f"• 📏 <b>Bất biến 21px:</b> {rh_status}",
+        f"• 🔢 <b>Bất biến ID dòng (#N):</b> {row_id_status}",
         f"• 📁 <b>Kho Drive Gốc (Quiz):</b> {drive_status}",
         f"────────────────────────────",
         f"📋 <b>Chi Tiết Từng Tab:</b>"
-    ]
+    ])
 
     for tab, data in tab_summaries.items():
-        report_lines.append(f"• <b>Tab {tab}:</b> {data['ready']} Ready / {data['pending']} Pending")
+        anom_str = f" | 🚨 {len(data['anomalies'])} LỖI LINK" if data['anomalies'] else ""
+        report_lines.append(f"• <b>Tab {tab}:</b> {data['ready']} Ready / {data['pending']} Pending{anom_str}")
         for rid, lnk in data.get("sample_links", []):
             report_lines.append(f"   ↳ {rid}: <a href='{lnk}'>Xem Video</a>")
 
+    if all_anomalies_details:
+        report_lines.append("────────────────────────────")
+        report_lines.append("🚨 <b>CHI TIẾT DÒNG BỊ LỆCH / THIẾU LINK (ĐÃ AUTO-HEAL VỀ PENDING):</b>")
+        for tab, anoms, healed_count in all_anomalies_details:
+            for item in anoms[:5]:
+                report_lines.append(f"  • [{tab}] {item}")
+            if len(anoms) > 5:
+                report_lines.append(f"  • [{tab}] ... và {len(anoms)-5} dòng khác")
+
     report_lines.append("────────────────────────────")
-    if total_pending == 0:
+    if total_pending == 0 and total_anomalies == 0 and total_rendering == 0:
         report_lines.append("🎉 <b>100% Video Đã Render Sẵn Sàng!</b> Anh có thể kích hoạt xuất bản mạng xã hội bất cứ lúc nào.")
     else:
-        report_lines.append(f"⚠ Còn {total_pending} dòng Pending cần render tiếp.")
+        pending_note = f"Còn {total_pending} dòng Pending." if total_pending > 0 else ""
+        anom_note = f"Có {total_anomalies} dòng lỗi/thiếu link cần xử lý!" if total_anomalies > 0 else ""
+        report_lines.append(f"⚠ <b>Cần chú ý:</b> {pending_note} {anom_note}".strip())
 
     report_text = "\n".join(report_lines)
     token, chat_id = get_telegram_creds()

@@ -5,7 +5,7 @@ Compliant with 06_SECURITY_AND_CODE_AUDITING_GUIDE.md (<= 150 lines).
 """
 import os, re, sys, time, argparse
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,8 +22,11 @@ except (ImportError, ModuleNotFoundError):
 def parse_args():
     parser = argparse.ArgumentParser(description="Publish quiz batch row to 3 Buffer 1 Social Media channels")
     parser.add_argument("--tab", type=str, default="pinyin", choices=["pinyin", "vocabCN", "vocabVN", "vocabcn", "vocabvn", "multilevels", "multilevelsquiz"])
-    parser.add_argument("--id", "--row", dest="row_id", type=int, required=True, help="Row number / Batch ID to publish")
-    parser.add_argument("--channels", type=str, default="all", help="Target channels: 'all', 'buffer1', 'youtube', 'tiktok', 'facebook', 'fb'")
+    parser.add_argument("--id", "--row", dest="row_id", type=int, default=None, help="Row number / Batch ID (optional, auto-detected if omitted)")
+    parser.add_argument("--level", type=str, default="", help="Filter auto-detect by HSK level (e.g. 'HSK 1', 'HSK 2', 'HSK 3')")
+    parser.add_argument("--schedule", type=str, default="", help="Multi-slot schedule: '07:16:HSK1,11:18:HSK2,16:26:HSK3' or '07:00,11:00,16:00'")
+    parser.add_argument("--channels", type=str, default="youtube,tiktok", help="Target channels: 'all', 'buffer1', 'youtube,tiktok', 'facebook'")
+    parser.add_argument("--time", "--scheduled-at", dest="scheduled_at", type=str, default="", help="Scheduled time 'HH:MM' or 'YYYY-MM-DD HH:MM'")
     parser.add_argument("--dry-run", action="store_true", help="Simulate publishing without writing to Buffer or Sheets")
     return parser.parse_args()
 
@@ -72,8 +75,26 @@ def to_direct_stream_url(url: str) -> str:
     return f"https://drive.usercontent.google.com/download?id={m.group(1)}&confirm=t" if m else url
 
 
-def publish_row_to_social(tab_name: str, row_id: int, channels: str = "buffer1", dry_run: bool = False, delay_minutes: int = 30) -> Dict[str, Any]:
-    """Executes social publishing with automatic 30-minute queue delay and updates Google Sheets state."""
+def find_eligible_row(rows: List[List[str]], level: str = "", exclude_rows: Optional[set] = None) -> Optional[int]:
+    """Finds the first eligible Ready row matching the specified level."""
+    exclude = exclude_rows or set()
+    headers = rows[0]
+    target_lvl = re.sub(r'[^a-zA-Z0-9]', '', level).lower() if level else ""
+    for idx in range(1, len(rows)):
+        r_num = idx + 1
+        if r_num in exclude: continue
+        r_data = rows[idx]
+        r_dict = {headers[i]: r_data[i] if i < len(r_data) else "" for i in range(len(headers))}
+        status, video = r_dict.get("Status", "").strip(), r_dict.get("Video", "").strip()
+        row_lvl = re.sub(r'[^a-zA-Z0-9]', '', r_dict.get("Level", "")).lower()
+        if status.lower() == "ready" and video and "drive.google.com" in video:
+            if not target_lvl or target_lvl in row_lvl:
+                return r_num
+    return None
+
+
+def publish_row_to_social(tab_name: str, row_id: int, channels: str = "youtube,tiktok", dry_run: bool = False, delay_minutes: int = 30, scheduled_at: Optional[str] = None) -> Dict[str, Any]:
+    """Executes social publishing with automatic or explicit scheduled time and updates Google Sheets state."""
     tab_map = {"vocabcn": "vocabCN", "vocabvn": "vocabVN", "pinyin": "pinyin", "multilevels": "multilevels", "multilevelsquiz": "multilevels"}
     target_tab = tab_map.get(tab_name.lower(), tab_name)
 
@@ -85,15 +106,27 @@ def publish_row_to_social(tab_name: str, row_id: int, channels: str = "buffer1",
     headers, row_data = rows[0], rows[row_id - 1]
     row_dict = {headers[i]: row_data[i] if i < len(row_data) else "" for i in range(len(headers))}
     topic, video_url = row_dict.get("Topic", "Unknown"), row_dict.get("Video", "").strip()
+    level = row_dict.get("Level", "")
     meta_map = parse_platform_metadata(row_dict)
     direct_video = to_direct_stream_url(video_url) if video_url else ""
     creds = load_buffer_credentials()
 
-    vn_time = (datetime.now() + timedelta(minutes=delay_minutes)).strftime("%H:%M %d/%m")
-    due_utc = (datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    if scheduled_at:
+        now_ict = datetime.now(timezone(timedelta(hours=7)))
+        s_str = scheduled_at.strip()
+        if len(s_str.split(":")) == 2 and " " not in s_str:
+            h, m = map(int, s_str.split(":"))
+            target_ict = now_ict.replace(hour=h, minute=m, second=0, microsecond=0)
+        else:
+            target_ict = datetime.strptime(s_str, "%Y-%m-%d %H:%M").replace(tzinfo=timezone(timedelta(hours=7)))
+        vn_time = target_ict.strftime("%H:%M %d/%m")
+        due_utc = target_ict.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    else:
+        vn_time = (datetime.now() + timedelta(minutes=delay_minutes)).strftime("%H:%M %d/%m")
+        due_utc = (datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
-    print(f"\n🚀 [SOCIAL DISPATCH] Tab: '{target_tab}' | Row #{row_id}: '{topic}'")
-    print(f"🎬 Video: {direct_video if direct_video else 'None'} | ⏰ Đăng lúc: {vn_time} (30 phút sau)")
+    print(f"\n🚀 [SOCIAL DISPATCH] Tab: '{target_tab}' | Row #{row_id} ({level}): '{topic}'")
+    print(f"🎬 Video: {direct_video if direct_video else 'None'} | ⏰ Đăng lúc: {vn_time}")
 
     published_channels = []
     for ch in SOCIAL_CHANNELS:
@@ -125,9 +158,12 @@ def publish_row_to_social(tab_name: str, row_id: int, channels: str = "buffer1",
         try:
             ws = client.open_by_key(os.getenv("SPREADSHEET_ID", "1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0")).worksheet(target_tab)
             ws.update_cell(row_id, 4, "Published")       # Column D: Status
-            ws.update_cell(row_id, 12, f"✔ Scheduled ({vn_time})") # Col L: Youtube
-            ws.update_cell(row_id, 13, f"✔ Scheduled ({vn_time})") # Col M: Tiktok
-            ws.update_cell(row_id, 14, f"✔ Scheduled ({vn_time})") # Col N: Facebook
+            if any("youtube" in p.lower() for p in published_channels):
+                ws.update_cell(row_id, 12, f"✔ Scheduled ({vn_time})")
+            if any("tiktok" in p.lower() for p in published_channels):
+                ws.update_cell(row_id, 13, f"✔ Scheduled ({vn_time})")
+            if any("facebook" in p.lower() for p in published_channels):
+                ws.update_cell(row_id, 14, f"✔ Scheduled ({vn_time})")
             print(f"🎉 Updated Sheet Tab '{target_tab}' Row #{row_id} Status -> 'Published' (Lịch: {vn_time})!")
         except Exception as e:
             print(f"⚠ Could not update sheet cells: {e}")
@@ -137,7 +173,48 @@ def publish_row_to_social(tab_name: str, row_id: int, channels: str = "buffer1",
 
 def main():
     args = parse_args()
-    publish_row_to_social(args.tab, args.row_id, channels=args.channels, dry_run=args.dry_run)
+    tab_map = {"vocabcn": "vocabCN", "vocabvn": "vocabVN", "pinyin": "pinyin", "multilevels": "multilevels", "multilevelsquiz": "multilevels"}
+    target_tab = tab_map.get(args.tab.lower(), args.tab)
+
+    if args.schedule:
+        client, err = get_gsheet_client()
+        if not client: raise RuntimeError(f"GSheet Auth Error: {err}")
+        ok, rows, msg = fetch_tab_raw_values(target_tab, client=client, use_cache=False)
+        if not ok: raise ValueError(f"Failed to fetch '{target_tab}': {msg}")
+
+        slots = [s.strip() for s in args.schedule.split(",") if s.strip()]
+        used_rows = set()
+        for slot in slots:
+            parts = slot.split(":")
+            if len(parts) >= 3:
+                time_str, lvl = f"{parts[0]}:{parts[1]}", parts[2]
+            elif len(parts) == 2:
+                time_str, lvl = slot, ""
+            else:
+                time_str, lvl = slot, ""
+
+            r_id = find_eligible_row(rows, level=lvl, exclude_rows=used_rows)
+            if not r_id:
+                print(f"❌ [Auto-Filter] Không tìm thấy dòng Ready nào cho Level '{lvl or 'bất kỳ'}' trong tab '{target_tab}'!")
+                continue
+            used_rows.add(r_id)
+            publish_row_to_social(target_tab, r_id, channels=args.channels, dry_run=args.dry_run, scheduled_at=time_str)
+        return
+
+    if args.row_id is not None:
+        publish_row_to_social(target_tab, args.row_id, channels=args.channels, dry_run=args.dry_run, scheduled_at=args.scheduled_at)
+    else:
+        client, err = get_gsheet_client()
+        if not client: raise RuntimeError(f"GSheet Auth Error: {err}")
+        ok, rows, msg = fetch_tab_raw_values(target_tab, client=client, use_cache=False)
+        if not ok: raise ValueError(f"Failed to fetch '{target_tab}': {msg}")
+
+        r_id = find_eligible_row(rows, level=args.level)
+        if not r_id:
+            print(f"❌ [Auto-Filter] Không tìm thấy dòng Ready nào cho Level '{args.level or 'bất kỳ'}' trong tab '{target_tab}'!")
+            sys.exit(1)
+        print(f"🎯 [Auto-Filter] Tìm thấy Dòng #{r_id} (Level: '{args.level or 'bất kỳ'}') trong tab '{target_tab}'")
+        publish_row_to_social(target_tab, r_id, channels=args.channels, dry_run=args.dry_run, scheduled_at=args.scheduled_at)
 
 
 if __name__ == "__main__":

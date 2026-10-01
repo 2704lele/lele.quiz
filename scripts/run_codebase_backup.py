@@ -29,8 +29,8 @@ MAP_FILE = QUIZ_ROOT / "gdrive_folder_map.json"
 USER_OAUTH_PATH = Path(os.path.expanduser("~/.cloud-profiles/lelehoctiengtrung/google_oauth/user_oauth2.json"))
 SA_PATH = Path(os.path.expanduser("~/.cloud-profiles/lelehoctiengtrung/google_sa/service_account.json"))
 
-DEFAULT_CODE_FOLDER_ID = "1C-n3Un-D6Teu4LapgIWWeVZ6l7toH8lm"
-DEFAULT_BACKUP_FOLDER_ID = "1QHYaOfvE8yoShR4UcM0o3zd0uOh7rhaK"
+DEFAULT_CODE_FOLDER_ID = "1ZbKUM09_mbRo7yOSOIWYmwsaIW1SvwMh"
+DEFAULT_BACKUP_FOLDER_ID = "1KFggc1ApUEsBxkX3-Bs62Wy-lYDCqlW3"
 
 EXCLUDE_DIRS = {
     ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",

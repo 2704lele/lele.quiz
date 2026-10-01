@@ -112,10 +112,10 @@ def ensure_system_dependencies():
         dev_ok = False
 
     if not dev_ok:
-        log("📦 Installing required C libraries via apt: ffmpeg, pkg-config, libpango1.0-dev, libcairo2-dev...")
+        log("📦 Installing required C libraries via apt: ffmpeg, pkg-config, libpango1.0-dev, libcairo2-dev, fonts-noto-cjk, fonts-noto-color-emoji...")
         subprocess.run(["sudo", "apt-get", "update", "-qq"], check=False)
         subprocess.run(
-            ["sudo", "apt-get", "install", "-y", "-qq", "ffmpeg", "pkg-config", "libpango1.0-dev", "libcairo2-dev", "fonts-noto-cjk"],
+            ["sudo", "apt-get", "install", "-y", "-qq", "ffmpeg", "pkg-config", "libpango1.0-dev", "libcairo2-dev", "fonts-noto-cjk", "fonts-noto-color-emoji"],
             check=False
         )
         log("✓ C development dependencies installed.")
@@ -125,23 +125,33 @@ def ensure_system_dependencies():
 
 def ensure_python_dependencies():
     """Ensure required Python packages are installed in Colab VM without breaking pre-installed packages."""
+    import importlib
     log("Verifying Python packages...")
     log(f"Current Python: {sys.executable} (Version: {sys.version.splitlines()[0]})")
 
     packages_map = {
         "manim": "manim",
-        "pypinyin": "pypinyin",
         "edge_tts": "edge-tts",
         "cv2": "opencv-python-headless",
         "opencc": "opencc-python-reimplemented",
+        "gspread": "gspread",
+        "googleapiclient": "google-api-python-client",
+        "google.auth": "google-auth",
+        "google_auth_oauthlib": "google-auth-oauthlib",
+        "pypinyin": "pypinyin",
+        "requests": "requests",
+        "rich": "rich",
+        "scipy": "scipy",
+        "numpy": "numpy",
+        "PIL": "Pillow",
         "pydub": "pydub",
-        "gspread": "gspread"
+        "yaml": "pyyaml"
     }
 
     needed = []
     for mod, pkg in packages_map.items():
         try:
-            __import__(mod)
+            importlib.import_module(mod)
         except ImportError:
             needed.append(pkg)
 
@@ -174,7 +184,7 @@ def ensure_python_dependencies():
         # Verification check
         for mod in packages_map.keys():
             try:
-                __import__(mod)
+                importlib.import_module(mod)
                 log(f"✓ Module '{mod}' verified ready.")
             except ImportError as ie:
                 log(f"⚠️ Warning: module '{mod}' import failed: {ie}")
@@ -269,7 +279,9 @@ def setup_credentials(quiz_dir: Path):
         for sub in ALL_PIPELINES:
             configs_dir = quiz_dir / sub / "configs"
             configs_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(sa_source, configs_dir / "service_account.json")
+            target = configs_dir / "service_account.json"
+            shutil.copy2(sa_source, target)
+            os.chmod(target, 0o600)
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(sa_source)
         log("✓ Service account credentials installed in all pipelines.")
     else:
@@ -292,7 +304,9 @@ def setup_credentials(quiz_dir: Path):
             for sub in ALL_PIPELINES:
                 configs_dir = quiz_dir / sub / "configs"
                 configs_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(oauth_source, configs_dir / "oauth_credentials.json")
+                target = configs_dir / "oauth_credentials.json"
+                shutil.copy2(oauth_source, target)
+                os.chmod(target, 0o600)
             log("✓ Google OAuth 2.0 installed in all pipelines.")
         except Exception as e:
             log(f"⚠️ Failed reading oauth credentials: {e}")
@@ -614,6 +628,16 @@ def main():
         if not ok:
             log(f"⚠️ Pipeline {sub} reported failure or incomplete rendering.")
             success_all = False
+
+    # Enforce strict 21px row height invariant post-execution across all tabs
+    try:
+        enforce_script = quiz_dir / "scripts" / "enforce_row_height_21px.py"
+        if enforce_script.exists():
+            log("📏 Enforcing strict 21px row height invariant post-execution...")
+            subprocess.run([sys.executable, str(enforce_script)], check=False)
+            log("✓ 21px Row Height Invariant enforced.")
+    except Exception as e:
+        log(f"Warning running enforce_row_height_21px.py: {e}")
 
     if success_all:
         log("🎉 [COLAB_QUIZ_COMPLETE] All requested pipelines completed successfully on Google Colab VM.")

@@ -72,7 +72,7 @@ def _http_post_json(url: str, payload: Dict[str, Any], headers: Optional[Dict[st
     for attempt in range(1, max_retries + 1):
         try:
             req = urllib.request.Request(url, data=data_bytes, headers=hdrs, method="POST")
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as e:
             last_err = e
@@ -86,7 +86,7 @@ def exchange_code_for_token(code: str, client_id: str, client_secret: str, redir
     payload = {"client_id": client_id, "client_secret": client_secret, "redirect_uri": redirect_uri, "code": code, "grant_type": "authorization_code"}
     data = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(TOKEN_URL, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 

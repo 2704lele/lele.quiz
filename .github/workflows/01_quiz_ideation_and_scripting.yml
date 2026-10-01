@@ -50,7 +50,7 @@ jobs:
       - name: "Install Python Dependencies"
         run: |
           python -m pip install --upgrade pip
-          pip install gspread google-api-python-client google-auth google-auth-oauthlib pypinyin requests pyyaml
+          pip install gspread google-api-python-client google-auth google-auth-oauthlib pypinyin requests rich pyyaml
 
       - name: "Configure Zero-Leak Vault Credentials"
         env:
@@ -115,7 +115,11 @@ jobs:
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             STATUS="${{ job.status }}"
-            MSG="💡 <b>[GHA Ideation Complete]</b>%0AStatus: <b>$STATUS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0ABatches: <code>${{ github.event.inputs.batch_count || '5' }}</code>%0AAll rows set to <b>Pending</b> (21px locked)."
+            if [ "$STATUS" = "success" ]; then
+              MSG="💡 <b>[GHA Ideation Thành Công]</b>%0AStatus: <b>✅ SUCCESS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0ABatches: <code>${{ github.event.inputs.batch_count || '5' }}</code>%0ACác dòng mới đã được tạo và chuyển sang <b>Pending</b> (21px locked)."
+            else
+              MSG="🚨 <b>[GHA Ideation THẤT BẠI]</b>%0AStatus: <b>❌ FAILURE</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0A⚠ Quá trình sinh nội dung AI gặp lỗi!"
+            fi
             curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
           fi

@@ -117,7 +117,11 @@ jobs:
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             STATUS="${{ job.status }}"
-            MSG="🎬 <b>[GHA Video Render Complete]</b>%0AStatus: <b>$STATUS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0AAll processed videos uploaded to Google Drive with <b>Ready</b> status (21px locked)."
+            if [ "$STATUS" = "success" ]; then
+              MSG="🎬 <b>[GHA Video Render Thành Công]</b>%0AStatus: <b>✅ SUCCESS</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0AToàn bộ video xử lý đã được upload lên Google Drive và chuyển sang trạng thái <b>Ready</b> (21px locked)."
+            else
+              MSG="🚨 <b>[GHA Video Render THẤT BẠI]</b>%0AStatus: <b>❌ FAILURE</b>%0ATab: <code>${{ github.event.inputs.tab || 'all' }}</code>%0A⚠ Tiến trình render hoặc upload lên Google Drive bị lỗi. Không có video mới được cập nhật vào Ready!"
+            fi
             curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=HTML" > /dev/null || true
           fi

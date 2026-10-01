@@ -17,7 +17,7 @@ Google Sheets (Master Database: 1b6LNl7JHRiCsjK1w9VuD86GLqAfmSOtDUOm5whrGdH0)
    │     ├── 01_quiz_ideation_and_scripting.yml (00:00 GMT+7 -> cron '0 17 * * *')
    │     ├── 02_quiz_video_rendering_and_qc.yml (Every 4h -> cron '30 18,22,2,6,10,14 * * *')
    │     ├── 03_quiz_morning_audit.yml (05:01 GMT+7 -> cron '1 22 * * *')
-   │     └── 04_quiz_social_distribution.yml (07:00 GMT+7 -> cron '0 0 * * *')
+   │     └── 04_quiz_social_distribution.yml (CHỈ DUYỆT THỦ CÔNG -> workflow_dispatch)
    │
    ▼
 Rendering Engines (Manim 1080x1920 60fps + Edge-TTS Audio)
@@ -69,7 +69,7 @@ State Transition & Invariant Enforcement
 - `01_quiz_ideation_and_scripting.yml`: cron `'0 17 * * *'` (00:00 GMT+7)
 - `02_quiz_video_rendering_and_qc.yml`: cron `'30 18,22,2,6,10,14 * * *'` (01:30, 05:30, 09:30, 13:30, 17:30, 21:30 GMT+7)
 - `03_quiz_morning_audit.yml`: cron `'1 22 * * *'` (05:01 GMT+7), `pip install ... rich`
-- `04_quiz_social_distribution.yml`: cron `'0 0 * * *'` (07:00 GMT+7), `pip install ... rich`
+- `04_quiz_social_distribution.yml`: Manual Approval Only (`workflow_dispatch`), `pip install ... rich`
 
 ### Google Sheets ↔ Pipeline State Machine
 - Tab names: `pinyin`, `vocabCN`, `vocabVN`, `multilevels`
